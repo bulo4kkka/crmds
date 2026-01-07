@@ -243,7 +243,7 @@ class Database:
                            transaction_type
                            TEXT
                            NOT
-                           NULL, -- 'income' или 'expense'
+                           NULL,
                            category
                            TEXT
                            NOT
@@ -328,7 +328,7 @@ class Database:
             ('dashboard_quick_actions', 'new_client,new_order,new_task,cash_view', 'dashboard'),
             ('tax_rate', '20', 'finance'),
             ('currency', '₽', 'general'),
-            ('company_name', 'Автосервис', 'general')
+            ('company_name', 'Автосервис CRM', 'general')
         ]
 
         for key, value, category in default_settings:
@@ -351,27 +351,26 @@ class Database:
         """Обновление настройки"""
         cursor = self.conn.cursor()
         cursor.execute('''
-            INSERT OR REPLACE INTO settings (key, value, updated_at)
-            VALUES (?, ?, CURRENT_TIMESTAMP)
-        ''', (key, value))
+                       UPDATE settings
+                       SET value      = ?,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE key = ?
+                       ''', (value, key))
         self.conn.commit()
-        return True
+        return cursor.rowcount > 0
 
-    def get_all_settings(self, category=None):
+    def get_all_settings(self):
         """Получение всех настроек"""
         cursor = self.conn.cursor()
-        if category:
-            cursor.execute('SELECT * FROM settings WHERE category = ? ORDER BY key', (category,))
-        else:
-            cursor.execute('SELECT * FROM settings ORDER BY category, key')
+        cursor.execute('SELECT * FROM settings ORDER BY category, key')
 
-        # Создаем структурированный словарь
+        # Структурируем по категориям
         settings_dict = {}
         for row in cursor.fetchall():
-            cat = row['category']
-            if cat not in settings_dict:
-                settings_dict[cat] = []
-            settings_dict[cat].append(dict(row))
+            category = row['category']
+            if category not in settings_dict:
+                settings_dict[category] = []
+            settings_dict[category].append(dict(row))
 
         return settings_dict
 
@@ -449,69 +448,22 @@ class Database:
     # ========== ЗАКАЗ-НАРЯДЫ ==========
 
     def add_work_order(self, client_id, description, order_number=None, total_amount=0):
-        """Добавление нового заказ-наряда - БЕЗ автоматического добавления в кассу"""
+        """Добавление нового заказ-наряда"""
         cursor = self.conn.cursor()
         try:
             if not order_number:
-                # Генерация номера заказа
                 date_str = datetime.now().strftime("%y%m%d")
                 cursor.execute('SELECT COUNT(*) FROM work_orders WHERE order_number LIKE ?', (f'{date_str}%',))
                 count = cursor.fetchone()[0] + 1
                 order_number = f"{date_str}-{count:03d}"
 
-            # Вставляем заказ-наряд БЕЗ вызова add_cash_flow
             cursor.execute('''
                            INSERT INTO work_orders (client_id, order_number, description, total_amount)
                            VALUES (?, ?, ?, ?)
                            ''', (client_id, order_number, description, total_amount))
 
-            order_id = cursor.lastrowid
             self.conn.commit()
-
-            print(f"✅ Заказ-наряд создан: ID={order_id}, номер={order_number}, сумма={total_amount}")
-            print(f"✅ НЕ добавляем автоматически в кассу - это будет сделано при завершении заказа")
-
-            return order_id
-
-        except Exception as e:
-            self.conn.rollback()
-            raise
-
-    def complete_work_order(self, order_id):
-        """Завершение заказ-наряда и добавление дохода в кассу"""
-        cursor = self.conn.cursor()
-        try:
-            # Получаем информацию о заказе
-            cursor.execute('SELECT order_number, total_amount FROM work_orders WHERE id = ?', (order_id,))
-            order = cursor.fetchone()
-
-            if not order:
-                raise ValueError(f"Заказ-наряд #{order_id} не найден")
-
-            order_number = order['order_number']
-            total_amount = order['total_amount']
-
-            # Обновляем статус
-            cursor.execute('''
-                           UPDATE work_orders
-                           SET status       = 'completed',
-                               completed_at = CURRENT_TIMESTAMP
-                           WHERE id = ?
-                           ''', (order_id,))
-
-            # Добавляем доход в кассу только если есть сумма
-            if total_amount > 0:
-                self.add_cash_flow(
-                    transaction_type='income',
-                    category='order_income',
-                    amount=total_amount,
-                    description=f'Доход от заказа {order_number}',
-                    order_id=order_id
-                )
-                print(f"✅ Добавлен доход в кассу для заказа #{order_number}: {total_amount} ₽")
-
-            self.conn.commit()
-            return True
+            return cursor.lastrowid
 
         except Exception as e:
             self.conn.rollback()
@@ -527,13 +479,6 @@ class Database:
                        VALUES (?, ?, ?, ?, ?)
                        ''', (order_id, work_name, quantity, price_per_unit, total_price))
 
-        # Обновляем общую сумму заказа
-        cursor.execute('''
-                       UPDATE work_orders
-                       SET total_amount = total_amount + ?
-                       WHERE id = ?
-                       ''', (total_price, order_id))
-
         self.conn.commit()
         return cursor.lastrowid
 
@@ -542,16 +487,11 @@ class Database:
         cursor = self.conn.cursor()
         total_cost = quantity * cost_per_unit
 
-        print(f"📊 Добавление расхода для заказа #{order_id}: {expense_name}, сумма={total_cost}")
-
         cursor.execute('''
                        INSERT INTO order_expenses (order_id, expense_name, expense_type, quantity, cost_per_unit,
                                                    total_cost, notes)
                        VALUES (?, ?, ?, ?, ?, ?, ?)
                        ''', (order_id, expense_name, expense_type, quantity, cost_per_unit, total_cost, notes))
-
-        # НЕ добавляем расход в кассу автоматически!
-        # Расходы будут учитываться отдельно через модуль кассы
 
         self.conn.commit()
         return cursor.lastrowid
@@ -612,6 +552,22 @@ class Database:
                                completed_at = CURRENT_TIMESTAMP
                            WHERE id = ?
                            ''', (status, order_id))
+
+            # Добавляем доход в кассу при завершении
+            cursor.execute('SELECT total_amount FROM work_orders WHERE id = ?', (order_id,))
+            result = cursor.fetchone()
+            if result and result[0] > 0:
+                cursor.execute('SELECT order_number FROM work_orders WHERE id = ?', (order_id,))
+                order_num = cursor.fetchone()[0]
+
+                # Проверяем, не добавлен ли уже доход
+                cursor.execute('SELECT COUNT(*) FROM cash_flow WHERE order_id = ? AND transaction_type = "income"',
+                               (order_id,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute('''
+                                   INSERT INTO cash_flow (transaction_type, category, amount, description, order_id)
+                                   VALUES ('income', 'order_income', ?, ?, ?)
+                                   ''', (result[0], f'Доход от заказа {order_num}', order_id))
         else:
             cursor.execute('''
                            UPDATE work_orders
@@ -619,6 +575,7 @@ class Database:
                                completed_at = NULL
                            WHERE id = ?
                            ''', (status, order_id))
+
         self.conn.commit()
         return cursor.rowcount > 0
 
@@ -730,11 +687,11 @@ class Database:
         params = []
 
         if start_date:
-            query += ' AND date >= ?'
+            query += ' AND date(date) >= date(?)'
             params.append(start_date)
 
         if end_date:
-            query += ' AND date <= ?'
+            query += ' AND date(date) <= date(?)'
             params.append(end_date)
 
         if transaction_type:
@@ -746,7 +703,7 @@ class Database:
         return cursor.fetchall()
 
     def get_financial_stats(self, period='month'):
-        """Получение финансовой статистики"""
+        """Получение финансовой статистики - ИСПРАВЛЕНО"""
         cursor = self.conn.cursor()
 
         # Определяем период
@@ -760,38 +717,36 @@ class Database:
         elif period == 'year':
             start_date = end_date.replace(month=1, day=1)
         else:
-            start_date = end_date - timedelta(days=30)  # по умолчанию 30 дней
+            start_date = end_date - timedelta(days=30)
 
         # Конвертируем в строки для SQL
-        start_date_str = start_date.strftime('%Y-%m-%d 00:00:00')
-        end_date_str = end_date.strftime('%Y-%m-%d 23:59:59')
+        start_date_str = start_date.strftime('%Y-%m-%d')
+        end_date_str = end_date.strftime('%Y-%m-%d')
 
         stats = {
             'period': period,
-            'start_date': start_date.strftime('%Y-%m-%d'),
-            'end_date': end_date.strftime('%Y-%m-%d')
+            'start_date': start_date_str,
+            'end_date': end_date_str
         }
 
-        print(f"📊 SQL запрос: start={start_date_str}, end={end_date_str}")
-
-        # Доходы
+        # Доходы за период
         cursor.execute('''
                        SELECT COALESCE(SUM(amount), 0) as total_income
                        FROM cash_flow
                        WHERE transaction_type = 'income'
-                         AND date >= ?
-                         AND date <= ?
+                         AND date (date) BETWEEN date (?)
+                         AND date (?)
                        ''', (start_date_str, end_date_str))
         result = cursor.fetchone()
         stats['total_income'] = float(result[0]) if result and result[0] else 0.0
 
-        # Расходы
+        # Расходы за период
         cursor.execute('''
                        SELECT COALESCE(SUM(amount), 0) as total_expenses
                        FROM cash_flow
                        WHERE transaction_type = 'expense'
-                         AND date >= ?
-                         AND date <= ?
+                         AND date (date) BETWEEN date (?)
+                         AND date (?)
                        ''', (start_date_str, end_date_str))
         result = cursor.fetchone()
         stats['total_expenses'] = float(result[0]) if result and result[0] else 0.0
@@ -804,8 +759,8 @@ class Database:
                        SELECT category, COALESCE(SUM(amount), 0) as amount
                        FROM cash_flow
                        WHERE transaction_type = 'income'
-                         AND date >= ?
-                         AND date <= ?
+                         AND date (date) BETWEEN date (?)
+                         AND date (?)
                        GROUP BY category
                        ''', (start_date_str, end_date_str))
 
@@ -822,8 +777,8 @@ class Database:
                        SELECT category, COALESCE(SUM(amount), 0) as amount
                        FROM cash_flow
                        WHERE transaction_type = 'expense'
-                         AND date >= ?
-                         AND date <= ?
+                         AND date (date) BETWEEN date (?)
+                         AND date (?)
                        GROUP BY category
                        ''', (start_date_str, end_date_str))
 
@@ -834,8 +789,6 @@ class Database:
                 'amount': float(row[1]) if row[1] else 0.0
             })
         stats['expenses_by_category'] = expenses_by_category
-
-        print(f"📊 Итоговая статистика: доходы={stats['total_income']}, расходы={stats['total_expenses']}")
 
         return stats
 

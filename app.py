@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, g
+from flask import Flask, render_template, request, jsonify
 from database import Database
 from datetime import datetime, timedelta
 import traceback
@@ -15,16 +15,23 @@ db = Database()
 def index():
     """Главная страница"""
     stats = db.get_stats()
-    settings = db.get_all_settings('dashboard')
-    quick_actions = db.get_setting('dashboard_quick_actions', 'new_client,new_order,new_task,cash_view').split(',')
+    settings_data = db.get_all_settings()
 
-    period = db.get_setting('dashboard_period', 'month')
+    # Получаем настройки дашборда
+    dashboard_settings = settings_data.get('dashboard', [])
+    settings_dict = {}
+    for setting in dashboard_settings:
+        settings_dict[setting['key']] = setting['value']
+
+    quick_actions = settings_dict.get('dashboard_quick_actions', 'new_client,new_order,new_task,cash_view').split(',')
+    period = settings_dict.get('dashboard_period', 'month')
+
     financial_stats = db.get_financial_stats(period)
-    show_expenses = db.get_setting('dashboard_show_expenses', 'true') == 'true'
+    show_expenses = settings_dict.get('dashboard_show_expenses', 'true') == 'true'
 
     return render_template('index.html',
                            stats=stats,
-                           settings=settings,
+                           settings=settings_dict,
                            quick_actions=quick_actions,
                            financial_stats=financial_stats,
                            show_expenses=show_expenses,
@@ -68,6 +75,7 @@ def cash_page():
     period = request.args.get('period', 'month')
     transaction_type = request.args.get('type', '')
 
+    # Определяем даты для периода
     end_date = datetime.now()
     if period == 'day':
         start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -80,12 +88,14 @@ def cash_page():
     else:
         start_date = end_date - timedelta(days=30)
 
+    # Получаем операции
     cash_flow = db.get_cash_flow(
         start_date.strftime('%Y-%m-%d'),
         end_date.strftime('%Y-%m-%d'),
         transaction_type if transaction_type else None
     )
 
+    # Финансовая статистика
     financial_stats = db.get_financial_stats(period)
     total_balance = db.get_total_balance()
 
@@ -101,14 +111,7 @@ def cash_page():
 def settings_page():
     """Страница настроек"""
     all_settings = db.get_all_settings()
-    settings_dict = {}
-    for setting in all_settings:
-        category = setting['category']
-        if category not in settings_dict:
-            settings_dict[category] = []
-        settings_dict[category].append(dict(setting))
-
-    return render_template('settings.html', settings=settings_dict)
+    return render_template('settings.html', settings=all_settings)
 
 
 # ========== API ДЛЯ КЛИЕНТОВ ==========
@@ -151,7 +154,7 @@ def add_client():
 
 @app.route('/api/clients/<int:client_id>', methods=['GET', 'PUT', 'DELETE'])
 def client_operations(client_id):
-    """Операции с клиентом: получение, обновление, удаление"""
+    """Операции с клиентом"""
     try:
         if request.method == 'GET':
             client = db.get_client(client_id)
@@ -202,8 +205,6 @@ def add_work_order():
             price = work.get('price', 0)
             total_amount += quantity * price
 
-        print(f"📊 Создание заказ-наряда: сумма работ = {total_amount}")
-
         order_id = db.add_work_order(
             client_id=data['client_id'],
             description=data['description'],
@@ -213,8 +214,6 @@ def add_work_order():
 
         if not order_id:
             return jsonify({'success': False, 'error': 'Не удалось создать заказ-наряд'}), 500
-
-        print(f"📊 Заказ-наряд создан с ID: {order_id}")
 
         for work in data.get('works', []):
             db.add_order_work(
@@ -277,24 +276,6 @@ def work_order_operations(order_id):
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/work_orders/<int:order_id>/complete', methods=['POST'])
-def complete_work_order_api(order_id):
-    """Завершение заказ-наряда и добавление дохода в кассу"""
-    try:
-        success = db.complete_work_order(order_id)
-
-        if success:
-            return jsonify({
-                'success': True,
-                'message': 'Заказ-наряд завершен, доход добавлен в кассу'
-            })
-        else:
-            return jsonify({'success': False, 'error': 'Не удалось завершить заказ-наряд'}), 404
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
 @app.route('/api/work_orders/<int:order_id>/status', methods=['PUT'])
 def update_order_status(order_id):
     """Обновление статуса заказ-наряда"""
@@ -306,13 +287,7 @@ def update_order_status(order_id):
         if not data.get('status'):
             return jsonify({'success': False, 'error': 'Отсутствует status'}), 400
 
-        status = data['status']
-
-        if status == 'completed':
-            success = db.complete_work_order(order_id)
-        else:
-            success = db.update_work_order_status(order_id, status)
-
+        success = db.update_work_order_status(order_id, data['status'])
         if success:
             return jsonify({'success': True, 'message': 'Статус обновлен'})
         return jsonify({'success': False, 'error': 'Заказ-наряд не найден'}), 404
@@ -479,99 +454,6 @@ def get_cash_stats():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@app.route('/api/cash/debug')
-def cash_debug():
-    """Отладочная информация о кассе"""
-    try:
-        cursor = db.conn.cursor()
-
-        cursor.execute(
-            'SELECT COUNT(*) as total, SUM(CASE WHEN transaction_type = "income" THEN amount ELSE 0 END) as total_income, SUM(CASE WHEN transaction_type = "expense" THEN amount ELSE 0 END) as total_expenses FROM cash_flow')
-        totals = cursor.fetchone()
-
-        cursor.execute(
-            'SELECT COUNT(*) as total_orders, SUM(total_amount) as total_revenue FROM work_orders WHERE status = "completed"')
-        orders = cursor.fetchone()
-
-        cursor.execute('SELECT * FROM cash_flow ORDER BY date DESC LIMIT 5')
-        recent_flows = cursor.fetchall()
-
-        cursor.execute('''
-                       SELECT wo.id,
-                              wo.order_number,
-                              wo.total_amount,
-                              wo.created_at,
-                              (SELECT COUNT(*)
-                               FROM cash_flow
-                               WHERE order_id = wo.id AND transaction_type = "income") as has_income_record
-                       FROM work_orders wo
-                       WHERE wo.status = "completed"
-                       ORDER BY wo.created_at DESC LIMIT 5
-                       ''')
-        recent_orders = cursor.fetchall()
-
-        debug_info = {
-            'cash_flow': {
-                'total_records': totals[0] if totals else 0,
-                'total_income': float(totals[1]) if totals and totals[1] else 0.0,
-                'total_expenses': float(totals[2]) if totals and totals[2] else 0.0,
-                'balance': (float(totals[1]) if totals and totals[1] else 0.0) - (
-                    float(totals[2]) if totals and totals[2] else 0.0)
-            },
-            'orders': {
-                'total_completed': orders[0] if orders else 0,
-                'total_revenue': float(orders[1]) if orders and orders[1] else 0.0
-            },
-            'recent_flows': [dict(row) for row in recent_flows],
-            'recent_orders': [dict(row) for row in recent_orders]
-        }
-
-        return jsonify({'success': True, 'debug': debug_info})
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
-@app.route('/api/cash/fix_missing_incomes', methods=['POST'])
-def fix_missing_incomes():
-    """Исправление отсутствующих доходов от заказ-нарядов"""
-    try:
-        cursor = db.conn.cursor()
-
-        cursor.execute('''
-                       SELECT wo.id, wo.order_number, wo.total_amount, wo.created_at
-                       FROM work_orders wo
-                       WHERE wo.status = 'completed'
-                         AND wo.total_amount > 0
-                         AND NOT EXISTS (SELECT 1
-                                         FROM cash_flow cf
-                                         WHERE cf.order_id = wo.id
-                                           AND cf.transaction_type = 'income')
-                       ''')
-
-        missing_orders = cursor.fetchall()
-        fixed_count = 0
-
-        for order in missing_orders:
-            db.add_cash_flow(
-                transaction_type='income',
-                category='order_income',
-                amount=order['total_amount'],
-                description=f'Доход от заказа {order["order_number"]} (исправлено автоматически)',
-                order_id=order['id']
-            )
-            fixed_count += 1
-
-        return jsonify({
-            'success': True,
-            'message': f'Исправлено {fixed_count} отсутствующих доходов',
-            'fixed_count': fixed_count
-        })
-
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-
 # ========== API ДЛЯ НАСТРОЕК ==========
 
 @app.route('/api/settings', methods=['GET', 'POST'])
@@ -579,19 +461,11 @@ def settings_operations():
     """Операции с настройками"""
     try:
         if request.method == 'GET':
-            category = request.args.get('category', '')
-            if category:
-                settings = db.get_all_settings(category)
-                return jsonify({
-                    'success': True,
-                    'settings': settings.get(category, [])
-                })
-            else:
-                all_settings = db.get_all_settings()
-                return jsonify({
-                    'success': True,
-                    'settings': all_settings
-                })
+            all_settings = db.get_all_settings()
+            return jsonify({
+                'success': True,
+                'settings': all_settings
+            })
 
         elif request.method == 'POST':
             if not request.is_json:

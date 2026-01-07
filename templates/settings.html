@@ -18,70 +18,68 @@
             </div>
             <div class="card-body">
                 <form id="dashboardSettings">
-                    {% for category, settings_list in settings.items() %}
-                        {% if category == 'dashboard' %}
-                            {% for setting in settings_list %}
-                                {% if setting.key == 'dashboard_period' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Период отображения статистики</label>
-                                    <select class="form-select" id="dashboard_period">
-                                        <option value="day" {% if setting.value == 'day' %}selected{% endif %}>День</option>
-                                        <option value="week" {% if setting.value == 'week' %}selected{% endif %}>Неделя</option>
-                                        <option value="month" {% if setting.value == 'month' %}selected{% endif %}>Месяц</option>
-                                        <option value="year" {% if setting.value == 'year' %}selected{% endif %}>Год</option>
-                                    </select>
-                                </div>
-                                {% endif %}
+                    {% if settings.dashboard %}
+                        {% for setting in settings.dashboard %}
+                            {% if setting.key == 'dashboard_period' %}
+                            <div class="mb-3">
+                                <label class="form-label">Период отображения статистики</label>
+                                <select class="form-select" id="dashboard_period">
+                                    <option value="day" {% if setting.value == 'day' %}selected{% endif %}>День</option>
+                                    <option value="week" {% if setting.value == 'week' %}selected{% endif %}>Неделя</option>
+                                    <option value="month" {% if setting.value == 'month' %}selected{% endif %}>Месяц</option>
+                                    <option value="year" {% if setting.value == 'year' %}selected{% endif %}>Год</option>
+                                </select>
+                            </div>
+                            {% endif %}
 
-                                {% if setting.key == 'dashboard_show_expenses' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Отображать расходы на дашборде</label>
-                                    <select class="form-select" id="dashboard_show_expenses">
-                                        <option value="true" {% if setting.value == 'true' %}selected{% endif %}>Да</option>
-                                        <option value="false" {% if setting.value == 'false' %}selected{% endif %}>Нет</option>
-                                    </select>
-                                </div>
-                                {% endif %}
+                            {% if setting.key == 'dashboard_show_expenses' %}
+                            <div class="mb-3">
+                                <label class="form-label">Отображать расходы на дашборде</label>
+                                <select class="form-select" id="dashboard_show_expenses">
+                                    <option value="true" {% if setting.value == 'true' %}selected{% endif %}>Да</option>
+                                    <option value="false" {% if setting.value == 'false' %}selected{% endif %}>Нет</option>
+                                </select>
+                            </div>
+                            {% endif %}
 
-                                {% if setting.key == 'dashboard_quick_actions' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Быстрые действия на дашборде</label>
-                                    <div class="border rounded p-3">
-                                        {% set quick_actions = setting.value.split(',') %}
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="action_new_client"
-                                                   {% if 'new_client' in quick_actions %}checked{% endif %}>
-                                            <label class="form-check-label" for="action_new_client">
-                                                Добавить клиента
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="action_new_order"
-                                                   {% if 'new_order' in quick_actions %}checked{% endif %}>
-                                            <label class="form-check-label" for="action_new_order">
-                                                Новый заказ-наряд
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="action_new_task"
-                                                   {% if 'new_task' in quick_actions %}checked{% endif %}>
-                                            <label class="form-check-label" for="action_new_task">
-                                                Новая задача
-                                            </label>
-                                        </div>
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" id="action_cash_view"
-                                                   {% if 'cash_view' in quick_actions %}checked{% endif %}>
-                                            <label class="form-check-label" for="action_cash_view">
-                                                Просмотр кассы
-                                            </label>
-                                        </div>
+                            {% if setting.key == 'dashboard_quick_actions' %}
+                            <div class="mb-3">
+                                <label class="form-label">Быстрые действия на дашборде</label>
+                                <div class="border rounded p-3">
+                                    {% set quick_actions = setting.value.split(',') %}
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="action_new_client"
+                                               {% if 'new_client' in quick_actions %}checked{% endif %}>
+                                        <label class="form-check-label" for="action_new_client">
+                                            Добавить клиента
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="action_new_order"
+                                               {% if 'new_order' in quick_actions %}checked{% endif %}>
+                                        <label class="form-check-label" for="action_new_order">
+                                            Новый заказ-наряд
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="action_new_task"
+                                               {% if 'new_task' in quick_actions %}checked{% endif %}>
+                                        <label class="form-check-label" for="action_new_task">
+                                            Новая задача
+                                        </label>
+                                    </div>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" id="action_cash_view"
+                                               {% if 'cash_view' in quick_actions %}checked{% endif %}>
+                                        <label class="form-check-label" for="action_cash_view">
+                                            Просмотр кассы
+                                        </label>
                                     </div>
                                 </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
 
                     <button type="button" class="btn btn-primary" onclick="saveDashboardSettings()">
                         <i class="bi bi-save"></i> Сохранить настройки
@@ -99,33 +97,29 @@
             </div>
             <div class="card-body">
                 <form id="financeSettings">
-                    {% for category, settings_list in settings.items() %}
-                        {% if category == 'finance' %}
-                            {% for setting in settings_list %}
-                                {% if setting.key == 'tax_rate' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Налоговая ставка (%)</label>
-                                    <input type="number" class="form-control" id="tax_rate"
-                                           value="{{ setting.value }}" step="0.1" min="0" max="100">
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
+                    {% if settings.finance %}
+                        {% for setting in settings.finance %}
+                            {% if setting.key == 'tax_rate' %}
+                            <div class="mb-3">
+                                <label class="form-label">Налоговая ставка (%)</label>
+                                <input type="number" class="form-control" id="tax_rate"
+                                       value="{{ setting.value }}" step="0.1" min="0" max="100">
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
 
-                    {% for category, settings_list in settings.items() %}
-                        {% if category == 'general' %}
-                            {% for setting in settings_list %}
-                                {% if setting.key == 'currency' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Валюта</label>
-                                    <input type="text" class="form-control" id="currency"
-                                           value="{{ setting.value }}" maxlength="3">
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
+                    {% if settings.general %}
+                        {% for setting in settings.general %}
+                            {% if setting.key == 'currency' %}
+                            <div class="mb-3">
+                                <label class="form-label">Валюта</label>
+                                <input type="text" class="form-control" id="currency"
+                                       value="{{ setting.value }}" maxlength="3">
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
 
                     <button type="button" class="btn btn-primary" onclick="saveFinanceSettings()">
                         <i class="bi bi-save"></i> Сохранить настройки
@@ -145,19 +139,17 @@
             </div>
             <div class="card-body">
                 <form id="generalSettings">
-                    {% for category, settings_list in settings.items() %}
-                        {% if category == 'general' %}
-                            {% for setting in settings_list %}
-                                {% if setting.key == 'company_name' %}
-                                <div class="mb-3">
-                                    <label class="form-label">Название компании</label>
-                                    <input type="text" class="form-control" id="company_name"
-                                           value="{{ setting.value }}">
-                                </div>
-                                {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% endfor %}
+                    {% if settings.general %}
+                        {% for setting in settings.general %}
+                            {% if setting.key == 'company_name' %}
+                            <div class="mb-3">
+                                <label class="form-label">Название компании</label>
+                                <input type="text" class="form-control" id="company_name"
+                                       value="{{ setting.value }}">
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    {% endif %}
 
                     <div class="alert alert-info">
                         <small>
@@ -173,7 +165,7 @@
             </div>
         </div>
 
-        <!-- Сброс данных -->
+        <!-- Сброс настроек -->
         <div class="card border-warning">
             <div class="card-header bg-warning text-dark">
                 <h5 class="mb-0">
@@ -190,7 +182,7 @@
 
                 <div class="d-grid gap-2">
                     <button type="button" class="btn btn-outline-danger" onclick="showResetModal()">
-                        <i class="bi bi-trash"></i> Сбросить настройки по умолчанию
+                        <i class="bi bi-arrow-clockwise"></i> Сбросить настройки по умолчанию
                     </button>
                 </div>
             </div>
@@ -211,14 +203,7 @@
             <div class="modal-body">
                 <div class="alert alert-danger">
                     <h6>Внимание!</h6>
-                    <p>Вы собираетесь сбросить все настройки к значениям по умолчанию:</p>
-                    <ul>
-                        <li>Период статистики: Месяц</li>
-                        <li>Отображение расходов: Да</li>
-                        <li>Быстрые действия: все</li>
-                        <li>Налоговая ставка: 20%</li>
-                        <li>Валюта: ₽</li>
-                    </ul>
+                    <p>Вы собираетесь сбросить все настройки к значениям по умолчанию.</p>
                     <p><strong>Текущие настройки будут потеряны!</strong></p>
                 </div>
                 <p>Для подтверждения введите "СБРОС" в поле ниже:</p>
@@ -265,7 +250,6 @@ function saveDashboardSettings() {
 
     const quickActions = actions.join(',');
 
-    // Массовое обновление
     const settingsData = {
         'dashboard_period': period,
         'dashboard_show_expenses': showExpenses,
@@ -303,17 +287,17 @@ function saveSettingsBulk(settingsData) {
         data: JSON.stringify(settingsData),
         success: function(response) {
             if (response.success) {
-                showNotification('Настройки сохранены успешно!', 'success');
+                alert('✅ Настройки сохранены успешно!');
             } else {
-                showNotification('Ошибка: ' + response.error, 'error');
+                alert('❌ Ошибка: ' + response.error);
             }
         },
         error: function(xhr) {
             try {
                 const error = JSON.parse(xhr.responseText);
-                showNotification('Ошибка: ' + error.error, 'error');
+                alert('❌ Ошибка: ' + error.error);
             } catch {
-                showNotification('Ошибка сервера', 'error');
+                alert('❌ Ошибка сервера');
             }
         }
     });
@@ -327,7 +311,7 @@ function resetSettings() {
         'dashboard_quick_actions': 'new_client,new_order,new_task,cash_view',
         'tax_rate': '20',
         'currency': '₽',
-        'company_name': 'Автосервис'
+        'company_name': 'Автосервис CRM'
     };
 
     $.ajax({
@@ -338,44 +322,21 @@ function resetSettings() {
         success: function(response) {
             if (response.success) {
                 $('#resetModal').modal('hide');
-                showNotification('Настройки сброшены к значениям по умолчанию', 'success');
-                setTimeout(() => {
-                    location.reload();
-                }, 1000);
+                alert('✅ Настройки сброшены к значениям по умолчанию');
+                location.reload();
             } else {
-                showNotification('Ошибка: ' + response.error, 'error');
+                alert('❌ Ошибка: ' + response.error);
             }
         },
         error: function(xhr) {
             try {
                 const error = JSON.parse(xhr.responseText);
-                showNotification('Ошибка: ' + error.error, 'error');
+                alert('❌ Ошибка: ' + error.error);
             } catch {
-                showNotification('Ошибка сервера', 'error');
+                alert('❌ Ошибка сервера');
             }
         }
     });
-}
-
-// Уведомления
-function showNotification(message, type) {
-    const alertClass = type === 'success' ? 'alert-success' : 'alert-danger';
-    const alert = $(`
-        <div class="alert ${alertClass} alert-dismissible fade show position-fixed"
-             style="top: 20px; right: 20px; z-index: 9999; max-width: 400px;">
-            <div class="d-flex align-items-center">
-                <i class="bi ${type === 'success' ? 'bi-check-circle' : 'bi-exclamation-circle'} me-2"></i>
-                <div>${message}</div>
-            </div>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    `);
-
-    $('body').append(alert);
-
-    setTimeout(() => {
-        alert.alert('close');
-    }, 5000);
 }
 </script>
 {% endblock %}
