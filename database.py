@@ -64,6 +64,50 @@ class Database:
                        )
                        ''')
 
+        # Работники
+        cursor.execute('''
+                       CREATE TABLE IF NOT EXISTS employees
+                       (
+                           id
+                           INTEGER
+                           PRIMARY
+                           KEY
+                           AUTOINCREMENT,
+                           full_name
+                           TEXT
+                           NOT
+                           NULL,
+                           position
+                           TEXT
+                           NOT
+                           NULL,
+                           phone
+                           TEXT,
+                           commission_rate
+                           REAL
+                           NOT
+                           NULL
+                           DEFAULT
+                           15.0,
+                           hire_date
+                           DATE,
+                           is_active
+                           BOOLEAN
+                           DEFAULT
+                           TRUE,
+                           notes
+                           TEXT,
+                           created_at
+                           TIMESTAMP
+                           DEFAULT
+                           CURRENT_TIMESTAMP,
+                           updated_at
+                           TIMESTAMP
+                           DEFAULT
+                           CURRENT_TIMESTAMP
+                       )
+                       ''')
+
         # Заказ-наряды
         cursor.execute('''
                        CREATE TABLE IF NOT EXISTS work_orders
@@ -77,6 +121,8 @@ class Database:
                            INTEGER
                            NOT
                            NULL,
+                           employee_id
+                           INTEGER,
                            order_number
                            TEXT
                            UNIQUE,
@@ -105,7 +151,15 @@ class Database:
                        ) REFERENCES clients
                        (
                            id
-                       ) ON DELETE CASCADE
+                       ) ON DELETE CASCADE,
+                           FOREIGN KEY
+                       (
+                           employee_id
+                       ) REFERENCES employees
+                       (
+                           id
+                       )
+                         ON DELETE SET NULL
                            )
                        ''')
 
@@ -149,7 +203,7 @@ class Database:
                            )
                        ''')
 
-        # Расходы в заказ-наряде
+        # Расходы в заказ-наряде (запчасти с наценкой)
         cursor.execute('''
                        CREATE TABLE IF NOT EXISTS order_expenses
                        (
@@ -178,17 +232,107 @@ class Database:
                            REAL
                            DEFAULT
                            0,
+                           markup
+                           REAL
+                           DEFAULT
+                           0, -- наценка в процентах
                            total_cost
                            REAL
                            DEFAULT
                            0,
-                           notes
-                           TEXT,
                            FOREIGN
                            KEY
                        (
                            order_id
                        ) REFERENCES work_orders
+                       (
+                           id
+                       ) ON DELETE CASCADE
+                           )
+                       ''')
+
+        # Начисления зарплаты работникам
+        cursor.execute('''
+                       CREATE TABLE IF NOT EXISTS employee_salary
+                       (
+                           id
+                           INTEGER
+                           PRIMARY
+                           KEY
+                           AUTOINCREMENT,
+                           employee_id
+                           INTEGER
+                           NOT
+                           NULL,
+                           order_id
+                           INTEGER,
+                           amount
+                           REAL
+                           NOT
+                           NULL,
+                           commission_rate
+                           REAL
+                           NOT
+                           NULL,
+                           works_total
+                           REAL
+                           NOT
+                           NULL,
+                           created_at
+                           TIMESTAMP
+                           DEFAULT
+                           CURRENT_TIMESTAMP,
+                           FOREIGN
+                           KEY
+                       (
+                           employee_id
+                       ) REFERENCES employees
+                       (
+                           id
+                       ) ON DELETE CASCADE,
+                           FOREIGN KEY
+                       (
+                           order_id
+                       ) REFERENCES work_orders
+                       (
+                           id
+                       )
+                         ON DELETE SET NULL
+                           )
+                       ''')
+
+        # Выплаты зарплаты
+        cursor.execute('''
+                       CREATE TABLE IF NOT EXISTS salary_payments
+                       (
+                           id
+                           INTEGER
+                           PRIMARY
+                           KEY
+                           AUTOINCREMENT,
+                           employee_id
+                           INTEGER
+                           NOT
+                           NULL,
+                           amount
+                           REAL
+                           NOT
+                           NULL,
+                           description
+                           TEXT,
+                           payment_date
+                           TIMESTAMP
+                           DEFAULT
+                           CURRENT_TIMESTAMP,
+                           created_at
+                           TIMESTAMP
+                           DEFAULT
+                           CURRENT_TIMESTAMP,
+                           FOREIGN
+                           KEY
+                       (
+                           employee_id
+                       ) REFERENCES employees
                        (
                            id
                        ) ON DELETE CASCADE
@@ -275,104 +419,16 @@ class Database:
                            )
                        ''')
 
-        # Настройки
-        cursor.execute('''
-                       CREATE TABLE IF NOT EXISTS settings
-                       (
-                           id
-                           INTEGER
-                           PRIMARY
-                           KEY
-                           AUTOINCREMENT,
-                           key
-                           TEXT
-                           NOT
-                           NULL
-                           UNIQUE,
-                           value
-                           TEXT,
-                           category
-                           TEXT
-                           DEFAULT
-                           'general',
-                           created_at
-                           TIMESTAMP
-                           DEFAULT
-                           CURRENT_TIMESTAMP,
-                           updated_at
-                           TIMESTAMP
-                           DEFAULT
-                           CURRENT_TIMESTAMP
-                       )
-                       ''')
-
         # Индексы
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_clients_phone ON clients(phone)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_employees_active ON employees(is_active)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_orders_status ON work_orders(status)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cashflow_date ON cash_flow(date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_cashflow_type ON cash_flow(transaction_type)')
-
-        # Добавляем начальные настройки
-        self._init_settings()
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_cashflow_category ON cash_flow(category)')
 
         self.conn.commit()
         print("✅ Все таблицы созданы/проверены")
-
-    def _init_settings(self):
-        """Инициализация настроек по умолчанию"""
-        cursor = self.conn.cursor()
-
-        default_settings = [
-            ('dashboard_period', 'month', 'dashboard'),
-            ('dashboard_show_expenses', 'true', 'dashboard'),
-            ('dashboard_quick_actions', 'new_client,new_order,new_task,cash_view', 'dashboard'),
-            ('tax_rate', '20', 'finance'),
-            ('currency', '₽', 'general'),
-            ('company_name', 'Автосервис CRM', 'general')
-        ]
-
-        for key, value, category in default_settings:
-            cursor.execute('''
-                           INSERT
-                           OR IGNORE INTO settings (key, value, category)
-                VALUES (?, ?, ?)
-                           ''', (key, value, category))
-
-    # ========== НАСТРОЙКИ ==========
-
-    def get_setting(self, key, default=None):
-        """Получение настройки"""
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
-        result = cursor.fetchone()
-        return result[0] if result else default
-
-    def update_setting(self, key, value):
-        """Обновление настройки"""
-        cursor = self.conn.cursor()
-        cursor.execute('''
-                       UPDATE settings
-                       SET value      = ?,
-                           updated_at = CURRENT_TIMESTAMP
-                       WHERE key = ?
-                       ''', (value, key))
-        self.conn.commit()
-        return cursor.rowcount > 0
-
-    def get_all_settings(self):
-        """Получение всех настроек"""
-        cursor = self.conn.cursor()
-        cursor.execute('SELECT * FROM settings ORDER BY category, key')
-
-        # Структурируем по категориям
-        settings_dict = {}
-        for row in cursor.fetchall():
-            category = row['category']
-            if category not in settings_dict:
-                settings_dict[category] = []
-            settings_dict[category].append(dict(row))
-
-        return settings_dict
 
     # ========== КЛИЕНТЫ ==========
 
@@ -445,9 +501,174 @@ class Database:
         self.conn.commit()
         return cursor.rowcount > 0
 
+    # ========== РАБОТНИКИ ==========
+
+    def add_employee(self, full_name, position, phone='', commission_rate=15.0, hire_date=None, is_active=True,
+                     notes=''):
+        """Добавление нового работника"""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                           INSERT INTO employees (full_name, position, phone, commission_rate, hire_date, is_active,
+                                                  notes)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)
+                           ''', (full_name, position, phone, commission_rate, hire_date, is_active, notes))
+
+            self.conn.commit()
+            return cursor.lastrowid
+
+        except Exception as e:
+            self.conn.rollback()
+            raise
+
+    def get_employees(self):
+        """Получение всех работников"""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM employees ORDER BY full_name')
+        return cursor.fetchall()
+
+    def get_active_employees(self):
+        """Получение активных работников"""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM employees WHERE is_active = TRUE ORDER BY full_name')
+        return cursor.fetchall()
+
+    def get_employee(self, employee_id):
+        """Получение работника по ID"""
+        cursor = self.conn.cursor()
+        cursor.execute('SELECT * FROM employees WHERE id = ?', (employee_id,))
+        return cursor.fetchone()
+
+    def get_employee_with_salary(self, employee_id):
+        """Получение работника с информацией о зарплате"""
+        cursor = self.conn.cursor()
+
+        # Получаем основную информацию о работнике
+        cursor.execute('SELECT * FROM employees WHERE id = ?', (employee_id,))
+        employee = cursor.fetchone()
+
+        if not employee:
+            return None
+
+        employee_dict = dict(employee)
+
+        # Получаем начисленную зарплату
+        cursor.execute('''
+                       SELECT COALESCE(SUM(amount), 0) as earned_amount
+                       FROM employee_salary
+                       WHERE employee_id = ?
+                       ''', (employee_id,))
+        earned_result = cursor.fetchone()
+        employee_dict['earned_amount'] = earned_result[0] if earned_result else 0
+
+        # Получаем выплаченную зарплату
+        cursor.execute('''
+                       SELECT COALESCE(SUM(amount), 0) as paid_amount
+                       FROM salary_payments
+                       WHERE employee_id = ?
+                       ''', (employee_id,))
+        paid_result = cursor.fetchone()
+        employee_dict['paid_amount'] = paid_result[0] if paid_result else 0
+
+        return employee_dict
+
+    def get_employees_with_salary(self):
+        """Получение всех работников с информацией о зарплате"""
+        cursor = self.conn.cursor()
+
+        cursor.execute('SELECT * FROM employees ORDER BY full_name')
+        employees = cursor.fetchall()
+
+        result = []
+        for employee in employees:
+            employee_dict = dict(employee)
+
+            # Начисленная зарплата
+            cursor.execute('''
+                           SELECT COALESCE(SUM(amount), 0) as earned_amount
+                           FROM employee_salary
+                           WHERE employee_id = ?
+                           ''', (employee['id'],))
+            earned_result = cursor.fetchone()
+            employee_dict['earned_amount'] = earned_result[0] if earned_result else 0
+
+            # Выплаченная зарплата
+            cursor.execute('''
+                           SELECT COALESCE(SUM(amount), 0) as paid_amount
+                           FROM salary_payments
+                           WHERE employee_id = ?
+                           ''', (employee['id'],))
+            paid_result = cursor.fetchone()
+            employee_dict['paid_amount'] = paid_result[0] if paid_result else 0
+
+            result.append(employee_dict)
+
+        return result
+
+    def update_employee(self, employee_id, **kwargs):
+        """Обновление данных работника"""
+        cursor = self.conn.cursor()
+        if not kwargs:
+            return False
+
+        # Добавляем updated_at
+        kwargs['updated_at'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        set_clause = ', '.join([f"{key} = ?" for key in kwargs.keys()])
+        values = list(kwargs.values())
+        values.append(employee_id)
+
+        cursor.execute(f'UPDATE employees SET {set_clause} WHERE id = ?', values)
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def update_employee_status(self, employee_id, is_active):
+        """Обновление статуса работника"""
+        cursor = self.conn.cursor()
+        cursor.execute('''
+                       UPDATE employees
+                       SET is_active  = ?,
+                           updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?
+                       ''', (is_active, employee_id))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def add_employee_salary(self, employee_id, order_id, amount, commission_rate, works_total):
+        """Добавление начисления зарплаты"""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                           INSERT INTO employee_salary (employee_id, order_id, amount, commission_rate, works_total)
+                           VALUES (?, ?, ?, ?, ?)
+                           ''', (employee_id, order_id, amount, commission_rate, works_total))
+
+            self.conn.commit()
+            return cursor.lastrowid
+
+        except Exception as e:
+            self.conn.rollback()
+            raise
+
+    def add_salary_payment(self, employee_id, amount, description=''):
+        """Добавление выплаты зарплаты"""
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute('''
+                           INSERT INTO salary_payments (employee_id, amount, description)
+                           VALUES (?, ?, ?)
+                           ''', (employee_id, amount, description))
+
+            self.conn.commit()
+            return cursor.lastrowid
+
+        except Exception as e:
+            self.conn.rollback()
+            raise
+
     # ========== ЗАКАЗ-НАРЯДЫ ==========
 
-    def add_work_order(self, client_id, description, order_number=None, total_amount=0):
+    def add_work_order(self, client_id, description, order_number=None, total_amount=0, employee_id=None):
         """Добавление нового заказ-наряда"""
         cursor = self.conn.cursor()
         try:
@@ -457,10 +678,12 @@ class Database:
                 count = cursor.fetchone()[0] + 1
                 order_number = f"{date_str}-{count:03d}"
 
+            # Сразу ставим статус "в работе" вместо "новый"
             cursor.execute('''
-                           INSERT INTO work_orders (client_id, order_number, description, total_amount)
-                           VALUES (?, ?, ?, ?)
-                           ''', (client_id, order_number, description, total_amount))
+                           INSERT INTO work_orders (client_id, employee_id, order_number, description,
+                                                    total_amount, status)
+                           VALUES (?, ?, ?, ?, ?, ?)
+                           ''', (client_id, employee_id, order_number, description, total_amount, 'in_progress'))
 
             self.conn.commit()
             return cursor.lastrowid
@@ -469,10 +692,24 @@ class Database:
             self.conn.rollback()
             raise
 
+    def update_work_order(self, order_id, **kwargs):
+        """Обновление заказ-наряда"""
+        cursor = self.conn.cursor()
+        if not kwargs:
+            return False
+
+        set_clause = ', '.join([f"{key} = ?" for key in kwargs.keys()])
+        values = list(kwargs.values())
+        values.append(order_id)
+
+        cursor.execute(f'UPDATE work_orders SET {set_clause} WHERE id = ?', values)
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def add_order_work(self, order_id, work_name, quantity=1, price_per_unit=0):
         """Добавление работы в заказ-наряд"""
         cursor = self.conn.cursor()
-        total_price = quantity * price_per_unit
+        total_price = round(quantity * price_per_unit, 2)
 
         cursor.execute('''
                        INSERT INTO order_works (order_id, work_name, quantity, price_per_unit, total_price)
@@ -482,16 +719,17 @@ class Database:
         self.conn.commit()
         return cursor.lastrowid
 
-    def add_order_expense(self, order_id, expense_name, expense_type='material', quantity=1, cost_per_unit=0, notes=''):
-        """Добавление расхода в заказ-наряд"""
+    def add_order_expense(self, order_id, expense_name, expense_type='material', quantity=1, cost_per_unit=0, markup=0):
+        """Добавление расхода в заказ-наряд с наценкой"""
         cursor = self.conn.cursor()
-        total_cost = quantity * cost_per_unit
+        item_cost = quantity * cost_per_unit
+        total_cost = round(item_cost * (1 + markup / 100), 2)  # Цена с наценкой для клиента
 
         cursor.execute('''
-                       INSERT INTO order_expenses (order_id, expense_name, expense_type, quantity, cost_per_unit,
-                                                   total_cost, notes)
+                       INSERT INTO order_expenses (order_id, expense_name, expense_type, quantity,
+                                                   cost_per_unit, markup, total_cost)
                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                       ''', (order_id, expense_name, expense_type, quantity, cost_per_unit, total_cost, notes))
+                       ''', (order_id, expense_name, expense_type, quantity, cost_per_unit, markup, total_cost))
 
         self.conn.commit()
         return cursor.lastrowid
@@ -502,9 +740,15 @@ class Database:
         if search_term:
             search_pattern = f'%{search_term}%'
             cursor.execute('''
-                           SELECT wo.*, c.full_name, c.phone, c.car_model, c.car_number
+                           SELECT wo.*,
+                                  c.full_name,
+                                  c.phone,
+                                  c.car_model,
+                                  c.car_number,
+                                  e.full_name as employee_name
                            FROM work_orders wo
                                     JOIN clients c ON wo.client_id = c.id
+                                    LEFT JOIN employees e ON wo.employee_id = e.id
                            WHERE wo.order_number LIKE ?
                               OR c.full_name LIKE ?
                               OR c.phone LIKE ?
@@ -512,9 +756,15 @@ class Database:
                            ''', (search_pattern, search_pattern, search_pattern))
         else:
             cursor.execute('''
-                           SELECT wo.*, c.full_name, c.phone, c.car_model, c.car_number
+                           SELECT wo.*,
+                                  c.full_name,
+                                  c.phone,
+                                  c.car_model,
+                                  c.car_number,
+                                  e.full_name as employee_name
                            FROM work_orders wo
                                     JOIN clients c ON wo.client_id = c.id
+                                    LEFT JOIN employees e ON wo.employee_id = e.id
                            ORDER BY wo.created_at DESC
                            ''')
         return cursor.fetchall()
@@ -523,9 +773,18 @@ class Database:
         """Получение заказ-наряда по ID"""
         cursor = self.conn.cursor()
         cursor.execute('''
-                       SELECT wo.*, c.full_name, c.phone, c.car_model, c.car_number, c.car_year, c.vin
+                       SELECT wo.*,
+                              c.full_name,
+                              c.phone,
+                              c.car_model,
+                              c.car_number,
+                              c.car_year,
+                              c.vin,
+                              e.full_name as employee_name,
+                              e.commission_rate
                        FROM work_orders wo
                                 JOIN clients c ON wo.client_id = c.id
+                                LEFT JOIN employees e ON wo.employee_id = e.id
                        WHERE wo.id = ?
                        ''', (order_id,))
         return cursor.fetchone()
@@ -542,42 +801,45 @@ class Database:
         cursor.execute('SELECT * FROM order_expenses WHERE order_id = ? ORDER BY id', (order_id,))
         return cursor.fetchall()
 
+    def delete_order_works(self, order_id):
+        """Удаление всех работ заказ-наряда"""
+        cursor = self.conn.cursor()
+        cursor.execute('DELETE FROM order_works WHERE order_id = ?', (order_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
+    def delete_order_expenses(self, order_id):
+        """Удаление всех расходов заказ-наряда"""
+        cursor = self.conn.cursor()
+        cursor.execute('DELETE FROM order_expenses WHERE order_id = ?', (order_id,))
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def update_work_order_status(self, order_id, status):
         """Обновление статуса заказ-наряда"""
         cursor = self.conn.cursor()
-        if status == 'completed':
-            cursor.execute('''
-                           UPDATE work_orders
-                           SET status       = ?,
-                               completed_at = CURRENT_TIMESTAMP
-                           WHERE id = ?
-                           ''', (status, order_id))
+        try:
+            if status == 'completed':
+                cursor.execute('''
+                               UPDATE work_orders
+                               SET status       = ?,
+                                   completed_at = CURRENT_TIMESTAMP
+                               WHERE id = ?
+                               ''', (status, order_id))
+            else:
+                cursor.execute('''
+                               UPDATE work_orders
+                               SET status       = ?,
+                                   completed_at = NULL
+                               WHERE id = ?
+                               ''', (status, order_id))
 
-            # Добавляем доход в кассу при завершении
-            cursor.execute('SELECT total_amount FROM work_orders WHERE id = ?', (order_id,))
-            result = cursor.fetchone()
-            if result and result[0] > 0:
-                cursor.execute('SELECT order_number FROM work_orders WHERE id = ?', (order_id,))
-                order_num = cursor.fetchone()[0]
-
-                # Проверяем, не добавлен ли уже доход
-                cursor.execute('SELECT COUNT(*) FROM cash_flow WHERE order_id = ? AND transaction_type = "income"',
-                               (order_id,))
-                if cursor.fetchone()[0] == 0:
-                    cursor.execute('''
-                                   INSERT INTO cash_flow (transaction_type, category, amount, description, order_id)
-                                   VALUES ('income', 'order_income', ?, ?, ?)
-                                   ''', (result[0], f'Доход от заказа {order_num}', order_id))
-        else:
-            cursor.execute('''
-                           UPDATE work_orders
-                           SET status       = ?,
-                               completed_at = NULL
-                           WHERE id = ?
-                           ''', (status, order_id))
-
-        self.conn.commit()
-        return cursor.rowcount > 0
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except Exception as e:
+            print(f"Ошибка при обновлении статуса заказа {order_id}: {e}")
+            self.conn.rollback()
+            return False
 
     def delete_work_order(self, order_id):
         """Удаление заказ-наряда"""
@@ -679,7 +941,7 @@ class Database:
             self.conn.rollback()
             raise
 
-    def get_cash_flow(self, start_date=None, end_date=None, transaction_type=None):
+    def get_cash_flow(self, start_date=None, end_date=None, transaction_type=None, category=None):
         """Получение операций кассы за период"""
         cursor = self.conn.cursor()
 
@@ -698,12 +960,16 @@ class Database:
             query += ' AND transaction_type = ?'
             params.append(transaction_type)
 
+        if category:
+            query += ' AND category = ?'
+            params.append(category)
+
         query += ' ORDER BY date DESC'
         cursor.execute(query, params)
         return cursor.fetchall()
 
     def get_financial_stats(self, period='month'):
-        """Получение финансовой статистики - ИСПРАВЛЕНО"""
+        """Получение финансовой статистики"""
         cursor = self.conn.cursor()
 
         # Определяем период
@@ -726,69 +992,80 @@ class Database:
         stats = {
             'period': period,
             'start_date': start_date_str,
-            'end_date': end_date_str
+            'end_date': end_date_str,
+            'total_income': 0.0,
+            'total_expenses': 0.0,
+            'net_profit': 0.0,
+            'income_by_category': [],
+            'expenses_by_category': []
         }
 
-        # Доходы за период
-        cursor.execute('''
-                       SELECT COALESCE(SUM(amount), 0) as total_income
-                       FROM cash_flow
-                       WHERE transaction_type = 'income'
-                         AND date (date) BETWEEN date (?)
-                         AND date (?)
-                       ''', (start_date_str, end_date_str))
-        result = cursor.fetchone()
-        stats['total_income'] = float(result[0]) if result and result[0] else 0.0
+        try:
+            # Доходы за период (исключая cash_out_no_expense)
+            cursor.execute('''
+                           SELECT COALESCE(SUM(amount), 0) as total_income
+                           FROM cash_flow
+                           WHERE transaction_type = 'income'
+                             AND date (date) BETWEEN date (?)
+                             AND date (?)
+                           ''', (start_date_str, end_date_str))
+            result = cursor.fetchone()
+            stats['total_income'] = float(result[0]) if result and result[0] else 0.0
 
-        # Расходы за период
-        cursor.execute('''
-                       SELECT COALESCE(SUM(amount), 0) as total_expenses
-                       FROM cash_flow
-                       WHERE transaction_type = 'expense'
-                         AND date (date) BETWEEN date (?)
-                         AND date (?)
-                       ''', (start_date_str, end_date_str))
-        result = cursor.fetchone()
-        stats['total_expenses'] = float(result[0]) if result and result[0] else 0.0
+            # Доходы по категориям
+            cursor.execute('''
+                           SELECT category, COALESCE(SUM(amount), 0) as amount
+                           FROM cash_flow
+                           WHERE transaction_type = 'income'
+                             AND date (date) BETWEEN date (?)
+                             AND date (?)
+                           GROUP BY category
+                           ORDER BY amount DESC
+                           ''', (start_date_str, end_date_str))
 
-        # Чистая прибыль
-        stats['net_profit'] = stats['total_income'] - stats['total_expenses']
+            income_by_category = []
+            for row in cursor.fetchall():
+                income_by_category.append({
+                    'category': row[0],
+                    'amount': float(row[1]) if row[1] else 0.0
+                })
+            stats['income_by_category'] = income_by_category
 
-        # Доходы по категориям
-        cursor.execute('''
-                       SELECT category, COALESCE(SUM(amount), 0) as amount
-                       FROM cash_flow
-                       WHERE transaction_type = 'income'
-                         AND date (date) BETWEEN date (?)
-                         AND date (?)
-                       GROUP BY category
-                       ''', (start_date_str, end_date_str))
+            # Расходы за период (исключая cash_out_no_expense)
+            cursor.execute('''
+                           SELECT COALESCE(SUM(amount), 0) as total_expenses
+                           FROM cash_flow
+                           WHERE transaction_type = 'expense'
+                             AND category != 'cash_out_no_expense'
+                             AND date(date) BETWEEN date(?) AND date(?)
+                           ''', (start_date_str, end_date_str))
+            result = cursor.fetchone()
+            stats['total_expenses'] = float(result[0]) if result and result[0] else 0.0
 
-        income_by_category = []
-        for row in cursor.fetchall():
-            income_by_category.append({
-                'category': row[0],
-                'amount': float(row[1]) if row[1] else 0.0
-            })
-        stats['income_by_category'] = income_by_category
+            # Расходы по категориям
+            cursor.execute('''
+                           SELECT category, COALESCE(SUM(amount), 0) as amount
+                           FROM cash_flow
+                           WHERE transaction_type = 'expense'
+                             AND category != 'cash_out_no_expense'
+                             AND date(date) BETWEEN date(?) AND date(?)
+                           GROUP BY category
+                           ORDER BY amount DESC
+                           ''', (start_date_str, end_date_str))
 
-        # Расходы по категориям
-        cursor.execute('''
-                       SELECT category, COALESCE(SUM(amount), 0) as amount
-                       FROM cash_flow
-                       WHERE transaction_type = 'expense'
-                         AND date (date) BETWEEN date (?)
-                         AND date (?)
-                       GROUP BY category
-                       ''', (start_date_str, end_date_str))
+            expenses_by_category = []
+            for row in cursor.fetchall():
+                expenses_by_category.append({
+                    'category': row[0],
+                    'amount': float(row[1]) if row[1] else 0.0
+                })
+            stats['expenses_by_category'] = expenses_by_category
 
-        expenses_by_category = []
-        for row in cursor.fetchall():
-            expenses_by_category.append({
-                'category': row[0],
-                'amount': float(row[1]) if row[1] else 0.0
-            })
-        stats['expenses_by_category'] = expenses_by_category
+            # Чистая прибыль
+            stats['net_profit'] = stats['total_income'] - stats['total_expenses']
+
+        except Exception as e:
+            print(f"Ошибка при получении статистики: {e}")
 
         return stats
 
@@ -797,9 +1074,9 @@ class Database:
         cursor = self.conn.cursor()
         cursor.execute('''
                        SELECT COALESCE(SUM(CASE WHEN transaction_type = 'income' THEN amount ELSE 0 END),
-                                       0)                                                                     as total_income,
+                                       0) as total_income,
                               COALESCE(SUM(CASE WHEN transaction_type = 'expense' THEN amount ELSE 0 END),
-                                       0)                                                                     as total_expenses
+                                       0) as total_expenses
                        FROM cash_flow
                        ''')
         result = cursor.fetchone()
@@ -818,6 +1095,10 @@ class Database:
         # Клиенты
         cursor.execute('SELECT COUNT(*) FROM clients')
         stats['total_clients'] = cursor.fetchone()[0]
+
+        # Работники
+        cursor.execute('SELECT COUNT(*) FROM employees WHERE is_active = TRUE')
+        stats['total_employees'] = cursor.fetchone()[0]
 
         # Заказ-наряды
         cursor.execute('SELECT COUNT(*) FROM work_orders')

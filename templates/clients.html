@@ -34,7 +34,7 @@
                         <th>Телефон</th>
                         <th>Автомобиль</th>
                         <th>Номер авто</th>
-                        <th>Дата регистрации</th>
+                        <th>Заказы</th>
                         <th width="100">Действия</th>
                     </tr>
                 </thead>
@@ -62,12 +62,17 @@
                             {% endif %}
                         </td>
                         <td>
-                            <small class="text-muted">
-                                {{ client.created_at[:10] }}
-                            </small>
+                            <a href="/work_orders?search={{ client.phone }}" class="btn btn-outline-info btn-sm btn-sm"
+                               title="Просмотреть заказы клиента">
+                                <i class="bi bi-clipboard-check"></i> Заказы
+                            </a>
                         </td>
                         <td>
                             <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-success"
+                                        onclick="createOrderForClient({{ client.id }})" title="Создать заказ">
+                                    <i class="bi bi-clipboard-plus"></i>
+                                </button>
                                 <button type="button" class="btn btn-outline-warning"
                                         onclick="editClient({{ client.id }})" title="Редактировать">
                                     <i class="bi bi-pencil"></i>
@@ -210,6 +215,11 @@
 
 {% block scripts %}
 <script>
+// Создание заказа для клиента
+function createOrderForClient(clientId) {
+    window.location.href = `/new_work_order?client_id=${clientId}`;
+}
+
 // Сохранение клиента
 function saveClient() {
     const form = $('#clientForm');

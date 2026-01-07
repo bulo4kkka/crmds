@@ -1,0 +1,530 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-pencil me-2"></i>Редактирование заказ-наряда
+    </h2>
+    <a href="/work_orders" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Назад к списку
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Основная информация</h5>
+            </div>
+            <div class="card-body">
+                <form id="workOrderForm">
+                    <div class="row mb-3">
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label">Поиск клиента</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="clientSearch"
+                                       placeholder="Введите ФИО, телефон или марку авто..."
+                                       oninput="filterClients()">
+                                <button class="btn btn-outline-secondary" type="button" onclick="filterClients()">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                            <small class="text-muted">Начните вводить для поиска клиента</small>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Клиент *</label>
+                            <select class="form-select" id="clientSelect" required>
+                                <option value="">-- Выберите клиента --</option>
+                                {% for client in clients %}
+                                <option value="{{ client.id }}"
+                                        data-text="{{ client.full_name }} - {{ client.car_model }} ({{ client.phone }})"
+                                        {% if order.client_id == client.id %}selected{% endif %}>
+                                    {{ client.full_name }} - {{ client.car_model }} ({{ client.phone }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Ответственный работник</label>
+                            <select class="form-select" id="employeeSelect">
+                                <option value="">-- Не назначен --</option>
+                                {% for employee in employees %}
+                                <option value="{{ employee.id }}" data-rate="{{ employee.commission_rate }}"
+                                        {% if order.employee_id == employee.id %}selected{% endif %}>
+                                    {{ employee.full_name }} ({{ employee.commission_rate }}%)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Описание работ *</label>
+                        <textarea class="form-control" id="description" rows="3" required
+                                  placeholder="Опишите проблему и необходимые работы...">{{ order.description }}</textarea>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Работы -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Выполненная работа</h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addWork()">
+                    <i class="bi bi-plus"></i> Добавить работу
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="worksContainer">
+                    <!-- Работы загружаются динамически -->
+                </div>
+                <div class="mt-2 text-end">
+                    <small>Итого по работам: <span id="worksTotal">0.00</span> ₽</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Запасные части и расходники -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Запасные части и расходники</h5>
+                <button type="button" class="btn btn-outline-primary btn-sm" onclick="addExpense()">
+                    <i class="bi bi-plus"></i> Добавить запчасть
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="expensesContainer">
+                    <!-- Запчасти загружаются динамически -->
+                </div>
+                <div class="mt-2 text-end">
+                    <small>Итого по запчастям: <span id="expensesTotal">0.00</span> ₽</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <!-- Итоговая информация -->
+        <div class="card sticky-top" style="top: 20px;">
+            <div class="card-header">
+                <h5 class="mb-0">Итоговая сумма</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Номер заказа</label>
+                    <input type="text" class="form-control" id="orderNumber" value="{{ order.order_number }}" readonly>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Статус</label>
+                    <input type="text" class="form-control" value="{% if order.status == 'new' %}В работе{% elif order.status == 'in_progress' %}В работе{% else %}Завершен{% endif %}" readonly>
+                </div>
+
+                <div class="mb-3">
+                    <h6>Финансовый расчет:</h6>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Выполненная работа:</span>
+                        <span id="incomeAmount">0.00 ₽</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1">
+                        <span>Запасные части и расходники:</span>
+                        <span id="expensesAmount">0.00 ₽</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-1 text-success">
+                        <span>Наценка на запчасти:</span>
+                        <span id="markupAmount">0.00 ₽</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between mb-1">
+                        <strong>Итого (клиенту):</strong>
+                        <strong id="totalAmount">0.00 ₽</strong>
+                    </div>
+                    <div class="d-flex justify-content-between text-success">
+                        <strong>Прибыль (работа + наценка):</strong>
+                        <strong id="netProfit">0.00 ₽</strong>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="button" class="btn btn-primary" onclick="updateWorkOrder()">
+                        <i class="bi bi-save"></i> Сохранить изменения
+                    </button>
+                    {% if order.status != 'completed' %}
+                    <button type="button" class="btn btn-success" onclick="completeOrder({{ order.id }})">
+                        <i class="bi bi-check-circle"></i> Завершить заказ
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Используем IIFE чтобы избежать конфликтов
+(function() {
+    let workCounter = 0;
+    let expenseCounter = 0;
+    const orderId = {{ order.id }};
+
+    // Загрузка данных заказа при загрузке страницы
+    $(document).ready(function() {
+        loadOrderData();
+
+        // События для пересчета итогов
+        $(document).on('input change',
+            '.work-name, .work-quantity, .work-price, .expense-name, .expense-quantity, .expense-cost, .expense-markup, .expense-type',
+            function() {
+                calculateTotals();
+            }
+        );
+    });
+
+    function loadOrderData() {
+        console.log('Загрузка данных заказа ID:', orderId);
+
+        $.ajax({
+            url: '/api/work_orders/' + orderId,
+            type: 'GET',
+            success: function(response) {
+                console.log('Получен ответ API:', response);
+
+                if (response.success && response.order) {
+                    // Очищаем контейнеры
+                    $('#worksContainer').empty();
+                    $('#expensesContainer').empty();
+
+                    workCounter = 0;
+                    expenseCounter = 0;
+
+                    // Загружаем работы
+                    if (response.works && response.works.length > 0) {
+                        console.log('Загружаем работы:', response.works.length);
+                        response.works.forEach(work => {
+                            addWorkRow(
+                                work.work_name || '',
+                                work.quantity || 1,
+                                work.price_per_unit || 0
+                            );
+                        });
+                    } else {
+                        console.log('Нет работ, добавляем пустую строку');
+                        addWorkRow('', 1, 0);
+                    }
+
+                    // Загружаем материалы
+                    if (response.expenses && response.expenses.length > 0) {
+                        console.log('Загружаем материалы:', response.expenses.length);
+                        response.expenses.forEach(expense => {
+                            addExpenseRow(
+                                expense.expense_name || '',
+                                expense.expense_type || 'material',
+                                expense.quantity || 1,
+                                expense.cost_per_unit || 0,
+                                expense.markup || 0
+                            );
+                        });
+                    } else {
+                        console.log('Нет материалов, добавляем пустую строку');
+                        addExpenseRow('', 'material', 1, 0, 0);
+                    }
+
+                    // Рассчитываем итоги
+                    calculateTotals();
+
+                } else {
+                    console.error('Ошибка в ответе API:', response.error);
+                    alert('Ошибка загрузки данных заказа: ' + (response.error || 'Неизвестная ошибка'));
+                    // Добавляем пустые строки
+                    addWorkRow('', 1, 0);
+                    addExpenseRow('', 'material', 1, 0, 0);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Ошибка AJAX:', status, error);
+                alert('Ошибка соединения с сервером');
+                // Добавляем пустые строки
+                addWorkRow('', 1, 0);
+                addExpenseRow('', 'material', 1, 0, 0);
+            }
+        });
+    }
+
+    function addWorkRow(name = '', quantity = 1, price = 0) {
+        workCounter++;
+        const html = `
+            <div class="work-item row mb-2" id="work-${workCounter}">
+                <div class="col-md-5">
+                    <input type="text" class="form-control form-control-sm work-name" placeholder="Название работы"
+                           value="${name.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" required>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control form-control-sm work-quantity" placeholder="Кол-во"
+                           value="${quantity}" min="1" step="1">
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control work-price" placeholder="Цена"
+                               value="${price}" step="0.01" min="0" required>
+                        <span class="input-group-text">₽</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeWork(${workCounter})">
+    <i class="bi bi-x-lg"></i>
+</button>
+                </div>
+            </div>
+        `;
+        $('#worksContainer').append(html);
+    }
+
+    function addExpenseRow(name = '', type = 'material', quantity = 1, cost = 0, markup = 0) {
+        expenseCounter++;
+        const html = `
+            <div class="expense-item row mb-2" id="expense-${expenseCounter}">
+                <div class="col-md-3">
+                    <input type="text" class="form-control form-control-sm expense-name" placeholder="Название запчасти"
+                           value="${name.replace(/"/g, '&quot;').replace(/'/g, '&#39;')}" required>
+                </div>
+                <div class="col-md-2">
+                    <select class="form-select form-select-sm expense-type">
+                        <option value="parts" ${type === 'parts' ? 'selected' : ''}>Запчасти</option>
+                        <option value="material" ${type === 'material' ? 'selected' : ''}>Расходники</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <input type="number" class="form-control form-control-sm expense-quantity" placeholder="Кол-во"
+                           value="${quantity}" min="1" step="1">
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control expense-cost" placeholder="Себестоимость"
+                               value="${cost}" step="0.01" min="0" required>
+                        <span class="input-group-text">₽</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <div class="input-group input-group-sm">
+                        <input type="number" class="form-control expense-markup" placeholder="Наценка"
+                               value="${markup}" step="0.01" min="0">
+                        <span class="input-group-text">%</span>
+                    </div>
+                </div>
+                <div class="col-md-1">
+                    <button type="button" class="btn btn-outline-danger btn-sm w-100" onclick="removeExpense(${expenseCounter})">
+    <i class="bi bi-x-lg"></i>
+</button>
+                </div>
+            </div>
+        `;
+        $('#expensesContainer').append(html);
+    }
+
+    // Делаем функции глобальными для вызова из HTML
+    window.removeWork = function(id) {
+        $('#work-' + id).remove();
+        calculateTotals();
+    };
+
+    window.removeExpense = function(id) {
+        $('#expense-' + id).remove();
+        calculateTotals();
+    };
+
+    // Добавление новой работы
+    window.addWork = function() {
+        addWorkRow('', 1, 0);
+    };
+
+    // Добавление нового материала
+    window.addExpense = function() {
+        addExpenseRow('', 'material', 1, 0, 30);
+    };
+
+    // Расчет итогов
+    function calculateTotals() {
+        let worksTotal = 0;
+        let expensesPrice = 0;
+        let markupTotal = 0;
+
+        // Считаем работы
+        $('.work-item').each(function() {
+            const quantity = parseFloat($(this).find('.work-quantity').val()) || 0;
+            const price = parseFloat($(this).find('.work-price').val()) || 0;
+            if (!isNaN(quantity) && !isNaN(price)) {
+                worksTotal += quantity * price;
+            }
+        });
+
+        // Считаем материалы
+        $('.expense-item').each(function() {
+            const quantity = parseFloat($(this).find('.expense-quantity').val()) || 0;
+            const cost = parseFloat($(this).find('.expense-cost').val()) || 0;
+            const markup = parseFloat($(this).find('.expense-markup').val()) || 0;
+
+            if (!isNaN(quantity) && !isNaN(cost) && !isNaN(markup)) {
+                const itemCost = quantity * cost;
+                const itemPrice = itemCost * (1 + markup / 100);
+                expensesPrice += itemPrice;
+                markupTotal += itemPrice - itemCost;
+            }
+        });
+
+        // Округляем
+        worksTotal = Math.round(worksTotal * 100) / 100;
+        expensesPrice = Math.round(expensesPrice * 100) / 100;
+        markupTotal = Math.round(markupTotal * 100) / 100;
+        const totalAmount = worksTotal + expensesPrice;
+        const netProfit = worksTotal + markupTotal;
+
+        // Обновляем UI
+        $('#worksTotal').text(worksTotal.toFixed(2));
+        $('#expensesTotal').text(expensesPrice.toFixed(2));
+        $('#incomeAmount').text(worksTotal.toFixed(2) + ' ₽');
+        $('#expensesAmount').text(expensesPrice.toFixed(2) + ' ₽');
+        $('#markupAmount').text(markupTotal.toFixed(2) + ' ₽');
+        $('#totalAmount').text(totalAmount.toFixed(2) + ' ₽');
+        $('#netProfit').text(netProfit.toFixed(2) + ' ₽');
+    }
+
+    // Обновление заказ-наряда
+    window.updateWorkOrder = function() {
+        const clientId = $('#clientSelect').val();
+        const description = $('#description').val();
+        const employeeId = $('#employeeSelect').val();
+
+        // Валидация
+        if (!clientId) {
+            alert('Пожалуйста, выберите клиента');
+            return;
+        }
+
+        if (!description.trim()) {
+            alert('Пожалуйста, введите описание работ');
+            return;
+        }
+
+        // Проверка работ
+        let hasWorks = false;
+        const works = [];
+        $('.work-item').each(function() {
+            const name = $(this).find('.work-name').val().trim();
+            const quantity = parseFloat($(this).find('.work-quantity').val()) || 1;
+            const price = parseFloat($(this).find('.work-price').val()) || 0;
+
+            if (name && price > 0) {
+                hasWorks = true;
+                works.push({
+                    name: name,
+                    quantity: quantity,
+                    price: price
+                });
+            }
+        });
+
+        if (!hasWorks) {
+            alert('Пожалуйста, добавьте хотя бы одну работу');
+            return;
+        }
+
+        // Сбор материалов
+        const expenses = [];
+        $('.expense-item').each(function() {
+            const name = $(this).find('.expense-name').val().trim();
+            const type = $(this).find('.expense-type').val();
+            const quantity = parseFloat($(this).find('.expense-quantity').val()) || 1;
+            const cost = parseFloat($(this).find('.expense-cost').val()) || 0;
+            const markup = parseFloat($(this).find('.expense-markup').val()) || 0;
+
+            if (name && cost > 0) {
+                expenses.push({
+                    name: name,
+                    type: type,
+                    quantity: quantity,
+                    cost: cost,
+                    markup: markup
+                });
+            }
+        });
+
+        const orderData = {
+            client_id: parseInt(clientId),
+            description: description.trim(),
+            employee_id: employeeId ? parseInt(employeeId) : null,
+            works: works,
+            expenses: expenses
+        };
+
+        console.log('Отправляем данные:', orderData);
+
+        // Показываем индикатор загрузки
+        const saveBtn = $('.btn-primary');
+        const originalText = saveBtn.html();
+        saveBtn.html('<span class="spinner-border spinner-border-sm" role="status"></span> Сохранение...');
+        saveBtn.prop('disabled', true);
+
+        $.ajax({
+            url: '/api/work_orders/' + orderId,
+            type: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(orderData),
+            success: function(response) {
+                saveBtn.html(originalText);
+                saveBtn.prop('disabled', false);
+
+                if (response.success) {
+                    alert('✅ Изменения сохранены!');
+                    location.reload();
+                } else {
+                    alert('❌ Ошибка: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                saveBtn.html(originalText);
+                saveBtn.prop('disabled', false);
+
+                try {
+                    const error = JSON.parse(xhr.responseText);
+                    alert('❌ Ошибка: ' + error.error);
+                } catch {
+                    alert('❌ Ошибка сервера: ' + xhr.statusText);
+                }
+            }
+        });
+    };
+
+    // Завершение заказа
+    window.completeOrder = function(orderId) {
+        if (confirm('Завершить заказ-наряд #' + orderId + '?\n\nЭто добавит доход в кассу и рассчитает зарплату работнику.')) {
+            $.ajax({
+                url: '/api/work_orders/' + orderId + '/complete',
+                type: 'POST',
+                success: function(response) {
+                    if (response.success) {
+                        alert('✅ Заказ завершен! Доход добавлен в кассу.');
+                        window.location.href = '/work_orders';
+                    } else {
+                        alert('❌ Ошибка: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    try {
+                        const error = JSON.parse(xhr.responseText);
+                        alert('❌ Ошибка: ' + error.error);
+                    } catch {
+                        alert('❌ Ошибка сервера');
+                    }
+                }
+            });
+        }
+    };
+})();
+</script>
+{% endblock %}
+{% endblock %}

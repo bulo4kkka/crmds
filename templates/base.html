@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CRM Автосервис</title>
 
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
@@ -14,7 +16,223 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
 
-    <style>
+    <!-- В секции <head> добавьте: -->
+<!-- В секции <head> добавьте: -->
+<style>
+    /* Стили для печати */
+    @media print {
+        /* Скрываем всё лишнее */
+        body * {
+            visibility: hidden !important;
+        }
+
+        /* Показываем только содержимое для печати */
+        .print-content,
+        .print-content * {
+            visibility: visible !important;
+        }
+
+        /* Позиционируем контент печати */
+        .print-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            margin: 0 !important;
+            padding: 15px !important;
+            font-size: 12px !important;
+            line-height: 1.2 !important;
+            color: #000 !important;
+            background: #fff !important;
+        }
+
+        /* Убираем все отступы и границы у body */
+        body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #fff !important;
+            font-size: 12px !important;
+        }
+
+        /* Скрываем ненужные элементы */
+        .no-print,
+        .modal-header,
+        .modal-footer,
+        .btn,
+        button,
+        nav,
+        header,
+        footer,
+        .navbar {
+            display: none !important;
+        }
+
+        /* Таблицы */
+        .print-content table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+            margin-bottom: 10px !important;
+            font-size: 11px !important;
+            word-wrap: break-word !important;
+        }
+
+        .print-content table th,
+        .print-content table td {
+            padding: 5px !important;
+            border: 1px solid #000 !important;
+            text-align: left !important;
+            vertical-align: top !important;
+            word-break: break-word !important;
+        }
+
+        .print-content table th {
+            background-color: #f8f9fa !important;
+            font-weight: bold !important;
+        }
+
+        /* Заголовки */
+        .print-content h1,
+        .print-content h2,
+        .print-content h3,
+        .print-content h4,
+        .print-content h5,
+        .print-content h6 {
+            color: #000 !important;
+            margin: 10px 0 5px 0 !important;
+            page-break-after: avoid !important;
+        }
+
+        .print-content h1 { font-size: 18px !important; }
+        .print-content h2 { font-size: 16px !important; }
+        .print-content h3 { font-size: 14px !important; }
+        .print-content h4 { font-size: 13px !important; }
+        .print-content h5 { font-size: 12px !important; }
+        .print-content h6 { font-size: 11px !important; }
+
+        /* Контейнеры */
+        .print-content .row {
+            display: flex !important;
+            flex-wrap: wrap !important;
+            margin: 0 -5px !important;
+        }
+
+        .print-content .col-md-6,
+        .print-content .col-md-8,
+        .print-content .col-md-4 {
+            padding: 0 5px !important;
+            box-sizing: border-box !important;
+            width: 50% !important;
+        }
+
+        .print-content .col-md-8 {
+            width: 66.666% !important;
+        }
+
+        .print-content .col-md-4 {
+            width: 33.333% !important;
+        }
+
+        /* Разделители */
+        .print-content hr {
+            border: none !important;
+            border-top: 2px solid #000 !important;
+            margin: 15px 0 !important;
+        }
+
+        /* Управление разрывом страниц */
+        .page-break {
+            page-break-before: always !important;
+        }
+
+        .avoid-break {
+            page-break-inside: avoid !important;
+        }
+
+        /* Подписи */
+        .signature-area {
+            margin-top: 30px !important;
+            padding-top: 20px !important;
+            border-top: 1px dashed #000 !important;
+        }
+
+        /* Фон и границы */
+        .print-content .bg-light {
+            background-color: #f8f9fa !important;
+            padding: 10px !important;
+            border: 1px solid #dee2e6 !important;
+        }
+
+        /* Жирный текст */
+        .print-content strong {
+            font-weight: bold !important;
+        }
+
+        /* Текст по центру */
+        .print-content .text-center {
+            text-align: center !important;
+        }
+
+        /* Текст справа */
+        .print-content .text-end {
+            text-align: right !important;
+        }
+
+        /* Отступы */
+        .print-content .mb-1 { margin-bottom: 5px !important; }
+        .print-content .mb-2 { margin-bottom: 10px !important; }
+        .print-content .mb-3 { margin-bottom: 15px !important; }
+        .print-content .mb-4 { margin-bottom: 20px !important; }
+        .print-content .mb-5 { margin-bottom: 25px !important; }
+
+        .print-content .mt-1 { margin-top: 5px !important; }
+        .print-content .mt-2 { margin-top: 10px !important; }
+        .print-content .mt-3 { margin-top: 15px !important; }
+        .print-content .mt-4 { margin-top: 20px !important; }
+        .print-content .mt-5 { margin-top: 25px !important; }
+
+        .print-content .p-3 { padding: 15px !important; }
+
+        /* Убираем тени и скругления */
+        .print-content * {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+        }
+    }
+        /* В base.css или в стилях модального окна добавьте: */
+#printContent .print-content {
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    font-family: Arial, sans-serif;
+    font-size: 12px;
+}
+
+#printContent table {
+    width: 100%;
+    table-layout: fixed;
+    word-wrap: break-word;
+}
+
+#printContent table th,
+#printContent table td {
+    padding: 6px;
+    word-break: break-word;
+}
+
+/* Для предпросмотра в модальном окне */
+.modal-lg {
+    max-width: 90%;
+}
+
+@media (min-width: 1200px) {
+    .modal-xl {
+        max-width: 1140px;
+    }
+}
         :root {
             --primary-dark: #0d1117;
             --secondary-dark: #161b22;
@@ -44,6 +262,10 @@
             -webkit-text-fill-color: transparent;
             letter-spacing: 1px;
         }
+        /* Добавьте в base.html или отдельный CSS файл */
+.fs-5 {
+    font-size: 1.25rem !important;
+}
 
         .sidebar {
             background-color: var(--secondary-dark);
@@ -51,6 +273,7 @@
             min-height: calc(100vh - 73px);
             padding-top: 1rem;
         }
+
 
         .nav-link {
             color: var(--text-light);
@@ -200,6 +423,7 @@
         .accordion-body {
             background-color: rgba(22, 27, 34, 0.5);
         }
+
     </style>
 </head>
 <body>
@@ -241,7 +465,7 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {% if 'new_work_order' in request.path %}active{% endif %}" href="/new_work_order">
+        <a class="nav-link {% if 'new_work_order' in request.path or 'edit_work_order' in request.path %}active{% endif %}" href="/new_work_order">
             <i class="bi bi-clipboard-plus"></i> Новый заказ
         </a>
     </li>
@@ -256,8 +480,8 @@
         </a>
     </li>
     <li class="nav-item">
-        <a class="nav-link {% if 'settings' in request.path %}active{% endif %}" href="/settings">
-            <i class="bi bi-gear"></i> Настройки
+        <a class="nav-link {% if 'employees' in request.path %}active{% endif %}" href="/employees">
+            <i class="bi bi-person-badge"></i> Работники
         </a>
     </li>
 </ul>
