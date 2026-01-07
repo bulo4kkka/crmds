@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-list-task me-2"></i>Задачи
+    </h2>
+    <div class="d-flex gap-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="/tasks" class="btn btn-outline-primary {% if not request.args.get('status') %}active{% endif %}">
+                Все
+            </a>
+            <a href="/tasks?status=pending" class="btn btn-outline-warning {% if request.args.get('status') == 'pending' %}active{% endif %}">
+                Ожидание
+            </a>
+            <a href="/tasks?status=in_progress" class="btn btn-outline-info {% if request.args.get('status') == 'in_progress' %}active{% endif %}">
+                В работе
+            </a>
+            <a href="/tasks?status=completed" class="btn btn-outline-success {% if request.args.get('status') == 'completed' %}active{% endif %}">
+                Завершены
+            </a>
+        </div>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTaskModal">
+            <i class="bi bi-plus-circle"></i> Новая задача
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Список задач</span>
+        <small class="text-muted">Всего: {{ tasks|length }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="accordion" id="tasksAccordion">
+            {% for task in tasks %}
+            <div class="accordion-item border-0 priority-{{ task.priority }}">
+                <div class="accordion-header">
+                    <button class="accordion-button collapsed d-flex justify-content-between align-items-center" 
+                            type="button" data-bs-toggle="collapse" 
+                            data-bs-target="#task{{ task.id }}" 
+                            aria-expanded="false">
+                        <div class="d-flex align-items-center">
+                            {% if task.priority == 'high' %}
+                            <span class="badge bg-danger me-2">Высокий</span>
+                            {% elif task.priority == 'medium' %}
+                            <span class="badge bg-warning me-2">Средний</span>
+                            {% else %}
+                            <span class="badge bg-primary me-2">Низкий</span>
+                            {% endif %}
+                            
+                            <div>
+                                <strong>{{ task.title }}</strong>
+                                {% if task.assigned_to %}
+                                <small class="text-muted ms-2">
+                                    <i class="bi bi-person"></i> {{ task.assigned_to }}
+                                </small>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <span class="badge me-3
+                                {% if task.status == 'pending' %}bg-warning
+                                {% elif task.status == 'in_progress' %}bg-info
+                                {% else %}bg-success{% endif %}">
+                                {% if task.status == 'pending' %}Ожидание
+                                {% elif task.status == 'in_progress' %}В работе
+                                {% else %}Завершена{% endif %}
+                            </span>
+                            {% if task.due_date %}
+                            <small class="text-muted me-3">
+                                <i class="bi bi-calendar"></i> {{ task.due_date[:10] }}
+                            </small>
+                            {% endif %}
+                            <i class="bi bi-chevron-down"></i>
+                        </div>
+                    </button>
+                </div>
+
+                <div id="task{{ task.id }}" class="accordion-collapse collapse"
+                     data-bs-parent="#tasksAccordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Описание:</h6>
+                                <p class="mb-3">{{ task.description or 'Без описания' }}</p>
+
+                                <div class="d-flex gap-2 align-items-center">
+                                    <small class="text-muted">
+                                        <i class="bi bi-calendar"></i>
+                                        Создана: {{ task.created_at[:10] }}
+                                    </small>
+
+                                    {% if task.completed_at %}
+                                    <small class="text-muted">
+                                        <i class="bi bi-check-circle"></i>
+                                        Завершена: {{ task.completed_at[:10] }}
+                                    </small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 text-end">
+                                <div class="btn-group-vertical">
+                                    {% if task.status == 'pending' %}
+                                    <button class="btn btn-outline-info btn-sm mb-2"
+                                            onclick="updateTaskStatus({{ task.id }}, 'in_progress')">
+                                        <i class="bi bi-play-circle"></i> В работу
+                                    </button>
+                                    {% elif task.status == 'in_progress' %}
+                                    <button class="btn btn-outline-success btn-sm mb-2"
+                                            onclick="updateTaskStatus({{ task.id }}, 'completed')">
+                                        <i class="bi bi-check-circle"></i> Завершить
+                                    </button>
+                                    {% endif %}
+
+                                    {% if task.status != 'completed' %}
+                                    <button class="btn btn-outline-warning btn-sm mb-2"
+                                            onclick="editTask({{ task.id }})">
+                                        <i class="bi bi-pencil"></i> Редактировать
+                                    </button>
+                                    {% endif %}
+
+                                    <button class="btn btn-outline-danger btn-sm"
+                                            onclick="deleteTask({{ task.id }})">
+                                        <i class="bi bi-trash"></i> Удалить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <div class="text-muted">
+                    <i class="bi bi-list-task display-6 mb-3"></i>
+                    <p>Задачи не найдены</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления задачи -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>Новая задача
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="taskForm">
+                    <div class="mb-3">
+                        <label class="form-label">Заголовок *</label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" name="description" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Приоритет</label>
+                            <select class="form-select" name="priority">
+                                <option value="low">Низкий</option>
+                                <option value="medium" selected>Средний</option>
+                                <option value="high">Высокий</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Назначена</label>
+                            <input type="text" class="form-control" name="assigned_to">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Срок выполнения</label>
+                        <input type="date" class="form-control" name="due_date">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveTask()">Создать</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования задачи -->
+<div class="modal fade" id="editTaskModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil me-2"></i>Редактировать задачу
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTaskForm">
+                    <input type="hidden" id="editTaskId">
+                    <div class="mb-3">
+                        <label class="form-label">Заголовок *</label>
+                        <input type="text" class="form-control" id="editTitle" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" id="editDescription" rows="3"></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Приоритет</label>
+                            <select class="form-select" id="editPriority">
+                                <option value="low">Низкий</option>
+                                <option value="medium">Средний</option>
+                                <option value="high">Высокий</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Статус</label>
+                            <select class="form-select" id="editStatus">
+                                <option value="pending">Ожидание</option>
+                                <option value="in_progress">В работе</option>
+                                <option value="completed">Завершена</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Назначена</label>
+                            <input type="text" class="form-control" id="editAssignedTo">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Срок выполнения</label>
+                            <input type="date" class="form-control" id="editDueDate">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="updateTask()">Обновить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Сохранение задачи
+function saveTask() {
+    const form = $('#taskForm');
+    const data = {};
+
+    form.serializeArray().forEach(item => {
+        if (item.value.trim()) {
+            data[item.name] = item.value.trim();
+        }
+    });
+
+    if (!data.title) {
+        alert('Пожалуйста, введите заголовок задачи');
+        return;
+    }
+
+    $.ajax({
+        url: '/api/tasks/add',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#addTaskModal').modal('hide');
+                form[0].reset();
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+
+// Обновление статуса задачи
+function updateTaskStatus(taskId, status) {
+    $.ajax({
+        url: '/api/tasks/' + taskId,
+        type: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ status: status }),
+        success: function(response) {
+            if (response.success) {
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function() {
+            alert('Ошибка при обновлении задачи');
+        }
+    });
+}
+
+// Редактирование задачи
+function editTask(taskId) {
+    $.ajax({
+        url: '/api/tasks/' + taskId,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                const task = response.task;
+                $('#editTaskId').val(task.id);
+                $('#editTitle').val(task.title);
+                $('#editDescription').val(task.description || '');
+                $('#editPriority').val(task.priority);
+                $('#editStatus').val(task.status);
+                $('#editAssignedTo').val(task.assigned_to || '');
+                $('#editDueDate').val(task.due_date ? task.due_date.slice(0, 10) : '');
+
+                $('#editTaskModal').modal('show');
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function() {
+            alert('Ошибка при загрузке данных задачи');
+        }
+    });
+}
+
+// Обновление задачи
+function updateTask() {
+    const taskId = $('#editTaskId').val();
+    const data = {
+        title: $('#editTitle').val(),
+        description: $('#editDescription').val(),
+        priority: $('#editPriority').val(),
+        status: $('#editStatus').val(),
+        assigned_to: $('#editAssignedTo').val(),
+        due_date: $('#editDueDate').val() || null
+    };
+
+    if (!data.title) {
+        alert('Пожалуйста, введите заголовок задачи');
+        return;
+    }
+
+    $.ajax({
+        url: '/api/tasks/' + taskId,
+        type: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#editTaskModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+
+// Удаление задачи
+function deleteTask(taskId) {
+    if (confirm('Удалить задачу #' + taskId + '?\n\nЭто действие нельзя отменить.')) {
+        $.ajax({
+            url: '/api/tasks/' + taskId,
+            type: 'DELETE',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + response.error);
+                }
+            },
+            error: function() {
+                alert('Ошибка при удалении задачи');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}

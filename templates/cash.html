@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-cash-stack me-2"></i>Касса
+    </h2>
+    <div class="d-flex gap-2">
+        <div class="btn-group" role="group">
+            <a href="/cash?period=day" class="btn btn-outline-primary btn-sm {% if period == 'day' %}active{% endif %}">
+                День
+            </a>
+            <a href="/cash?period=week" class="btn btn-outline-primary btn-sm {% if period == 'week' %}active{% endif %}">
+                Неделя
+            </a>
+            <a href="/cash?period=month" class="btn btn-outline-primary btn-sm {% if period == 'month' %}active{% endif %}">
+                Месяц
+            </a>
+            <a href="/cash?period=year" class="btn btn-outline-primary btn-sm {% if period == 'year' %}active{% endif %}">
+                Год
+            </a>
+        </div>
+        
+        <div class="btn-group" role="group">
+            <a href="/cash?period={{ period }}" class="btn btn-outline-secondary btn-sm {% if not transaction_type %}active{% endif %}">
+                Все
+            </a>
+            <a href="/cash?period={{ period }}&type=income" class="btn btn-outline-success btn-sm {% if transaction_type == 'income' %}active{% endif %}">
+                Доходы
+            </a>
+            <a href="/cash?period={{ period }}&type=expense" class="btn btn-outline-danger btn-sm {% if transaction_type == 'expense' %}active{% endif %}">
+                Расходы
+            </a>
+        </div>
+        
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTransactionModal">
+            <i class="bi bi-plus-circle"></i> Добавить операцию
+        </button>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-dark border-success">
+            <div class="card-body text-center">
+                <h3 class="card-title text-success">{{ financial_stats.total_income }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-arrow-up-circle fs-4"></i><br>
+                    Доходы за период
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-danger">
+            <div class="card-body text-center">
+                <h3 class="card-title text-danger">{{ financial_stats.total_expenses }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-arrow-down-circle fs-4"></i><br>
+                    Расходы за период
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-primary">
+            <div class="card-body text-center">
+                <h3 class="card-title text-primary">{{ financial_stats.net_profit }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-graph-up fs-4"></i><br>
+                    Чистая прибыль
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-warning">
+            <div class="card-body text-center">
+                <h3 class="card-title text-warning">{{ total_balance }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-wallet fs-4"></i><br>
+                    Общий баланс
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Графики -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Доходы по категориям</h5>
+            </div>
+            <div class="card-body">
+                <div id="incomeChart" style="height: 250px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Расходы по категориям</h5>
+            </div>
+            <div class="card-body">
+                <div id="expensesChart" style="height: 250px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Операции -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Операции за период</span>
+        <small class="text-muted">{{ financial_stats.start_date }} - {{ financial_stats.end_date }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Тип</th>
+                        <th>Категория</th>
+                        <th>Описание</th>
+                        <th>Сумма</th>
+                        <th>Заказ</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for flow in cash_flow %}
+                    <tr>
+                        <td>{{ flow.date[:10] }}</td>
+                        <td>
+                            {% if flow.transaction_type == 'income' %}
+                            <span class="badge bg-success">Доход</span>
+                            {% else %}
+                            <span class="badge bg-danger">Расход</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">{{ flow.category }}</span>
+                        </td>
+                        <td>{{ flow.description or '—' }}</td>
+                        <td>
+                            {% if flow.transaction_type == 'income' %}
+                            <span class="text-success">+{{ flow.amount }} ₽</span>
+                            {% else %}
+                            <span class="text-danger">-{{ flow.amount }} ₽</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if flow.order_id %}
+                            <a href="/work_orders?search={{ flow.order_id }}" class="btn btn-outline-info btn-sm">
+                                #{{ flow.order_id }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-cash display-6 mb-3"></i>
+                                <p>Операции не найдены</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления операции -->
+<div class="modal fade" id="addTransactionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-plus-circle me-2"></i>Новая операция
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="transactionForm">
+                    <div class="mb-3">
+                        <label class="form-label">Тип операции *</label>
+                        <select class="form-select" id="transactionType" required>
+                            <option value="">-- Выберите тип --</option>
+                            <option value="income">Доход</option>
+                            <option value="expense">Расход</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Категория *</label>
+                        <select class="form-select" id="category" required>
+                            <option value="">-- Выберите категорию --</option>
+                            <option value="order_income">Доход от заказа</option>
+                            <option value="other_income">Прочий доход</option>
+                            <option value="material">Материалы</option>
+                            <option value="parts">Запчасти</option>
+                            <option value="salary">Зарплата</option>
+                            <option value="rent">Аренда</option>
+                            <option value="utilities">Коммунальные</option>
+                            <option value="other_expense">Прочие расходы</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Сумма *</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="amount" required step="0.01" min="0">
+                            <span class="input-group-text">₽</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Описание</label>
+                        <textarea class="form-control" id="description" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Номер заказа (если применимо)</label>
+                        <input type="number" class="form-control" id="orderId" min="1">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveTransaction()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+// Инициализация графиков
+document.addEventListener('DOMContentLoaded', function() {
+    renderCharts();
+});
+
+function renderCharts() {
+    // Доходы по категориям
+    const incomeCtx = document.getElementById('incomeChart').getContext('2d');
+    const incomeData = {
+        labels: [
+            {% for item in financial_stats.income_by_category %}
+            '{{ item.category }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for item in financial_stats.income_by_category %}
+                {{ item.amount }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#1f6feb', '#58a6ff', '#0d419d', '#1259d6', '#3fb950'
+            ]
+        }]
+    };
+    
+    new Chart(incomeCtx, {
+        type: 'doughnut',
+        data: incomeData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#c9d1d9'
+                    }
+                }
+            }
+        }
+    });
+    
+    // Расходы по категориям
+    const expensesCtx = document.getElementById('expensesChart').getContext('2d');
+    const expensesData = {
+        labels: [
+            {% for item in financial_stats.expenses_by_category %}
+            '{{ item.category }}',
+            {% endfor %}
+        ],
+        datasets: [{
+            data: [
+                {% for item in financial_stats.expenses_by_category %}
+                {{ item.amount }},
+                {% endfor %}
+            ],
+            backgroundColor: [
+                '#da3633', '#f85149', '#9e6a03', '#d29922', '#8b949e'
+            ]
+        }]
+    };
+    
+    new Chart(expensesCtx, {
+        type: 'doughnut',
+        data: expensesData,
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: {
+                        color: '#c9d1d9'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Сохранение операции
+function saveTransaction() {
+    const transactionType = $('#transactionType').val();
+    const category = $('#category').val();
+    const amount = parseFloat($('#amount').val());
+    const description = $('#description').val();
+    const orderId = $('#orderId').val();
+    
+    if (!transactionType || !category || !amount) {
+        alert('Пожалуйста, заполните обязательные поля');
+        return;
+    }
+    
+    const transactionData = {
+        transaction_type: transactionType,
+        category: category,
+        amount: amount,
+        description: description,
+        order_id: orderId ? parseInt(orderId) : null
+    };
+    
+    $.ajax({
+        url: '/api/cash/add',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(transactionData),
+        success: function(response) {
+            if (response.success) {
+                $('#addTransactionModal').modal('hide');
+                $('#transactionForm')[0].reset();
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

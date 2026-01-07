@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ru" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRM Автосервис</title>
+
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-dark: #0d1117;
+            --secondary-dark: #161b22;
+            --accent-blue: #1f6feb;
+            --accent-light-blue: #58a6ff;
+            --text-light: #c9d1d9;
+            --text-muted: #8b949e;
+            --border-dark: #30363d;
+            --success: #238636;
+            --warning: #9e6a03;
+            --danger: #da3633;
+        }
+
+        body {
+            background-color: var(--primary-dark);
+            color: var(--text-light);
+            font-family: 'Roboto', sans-serif;
+            min-height: 100vh;
+        }
+
+        .navbar-brand {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-light-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 1px;
+        }
+
+        .sidebar {
+            background-color: var(--secondary-dark);
+            border-right: 1px solid var(--border-dark);
+            min-height: calc(100vh - 73px);
+            padding-top: 1rem;
+        }
+
+        .nav-link {
+            color: var(--text-light);
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0;
+            border-radius: 6px;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: rgba(31, 111, 235, 0.15);
+            color: var(--accent-light-blue);
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .nav-link i {
+            width: 20px;
+            margin-right: 10px;
+        }
+
+        .card {
+            background-color: var(--secondary-dark);
+            border: 1px solid var(--border-dark);
+            border-radius: 8px;
+        }
+
+        .card-header {
+            background-color: rgba(22, 27, 34, 0.9);
+            border-bottom: 1px solid var(--border-dark);
+            font-weight: 600;
+        }
+
+        .table {
+            color: var(--text-light);
+            margin-bottom: 0;
+        }
+
+        .table-dark {
+            --bs-table-bg: transparent;
+            --bs-table-striped-bg: rgba(31, 111, 235, 0.05);
+            --bs-table-hover-bg: rgba(31, 111, 235, 0.1);
+        }
+
+        .table > :not(caption) > * > * {
+            border-bottom-color: var(--border-dark);
+        }
+
+        .btn-primary {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+            font-weight: 500;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-light-blue);
+            border-color: var(--accent-light-blue);
+        }
+
+        .btn-outline-primary {
+            color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        .form-control, .form-select {
+            background-color: var(--primary-dark);
+            border-color: var(--border-dark);
+            color: var(--text-light);
+        }
+
+        .form-control:focus, .form-select:focus {
+            background-color: var(--primary-dark);
+            border-color: var(--accent-blue);
+            color: var(--text-light);
+            box-shadow: 0 0 0 0.25rem rgba(31, 111, 235, 0.25);
+        }
+
+        .modal-content {
+            background-color: var(--secondary-dark);
+            border: 1px solid var(--border-dark);
+        }
+
+        .modal-header, .modal-footer {
+            border-color: var(--border-dark);
+        }
+
+        .badge {
+            font-weight: 500;
+            padding: 0.4em 0.8em;
+        }
+
+        .status-badge-new {
+            background-color: rgba(31, 111, 235, 0.2);
+            color: var(--accent-light-blue);
+        }
+
+        .status-badge-in_progress {
+            background-color: rgba(158, 106, 3, 0.2);
+            color: #ffd33d;
+        }
+
+        .status-badge-completed {
+            background-color: rgba(35, 134, 54, 0.2);
+            color: #3fb950;
+        }
+
+        .priority-high {
+            border-left: 3px solid var(--danger);
+        }
+
+        .priority-medium {
+            border-left: 3px solid var(--warning);
+        }
+
+        .priority-low {
+            border-left: 3px solid var(--accent-blue);
+        }
+
+        .client-row:nth-child(even) {
+            background-color: rgba(31, 111, 235, 0.05);
+        }
+
+        .client-row:hover {
+            background-color: rgba(31, 111, 235, 0.1);
+        }
+
+        .accordion-button {
+            background-color: var(--secondary-dark);
+            color: var(--text-light);
+        }
+
+        .accordion-button:not(.collapsed) {
+            background-color: rgba(31, 111, 235, 0.15);
+            color: var(--accent-light-blue);
+        }
+
+        .accordion-button:focus {
+            border-color: var(--accent-blue);
+            box-shadow: 0 0 0 0.25rem rgba(31, 111, 235, 0.25);
+        }
+
+        .accordion-body {
+            background-color: rgba(22, 27, 34, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <!-- Навигационная панель -->
+    <nav class="navbar navbar-expand-lg navbar-dark" style="background-color: var(--secondary-dark); border-bottom: 1px solid var(--border-dark);">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <i class="bi bi-tools me-2"></i>
+                АВТОСЕРВИС CRM
+            </a>
+
+            <div class="d-flex align-items-center">
+                <div class="me-3 text-muted">
+                    <small id="currentDateTime"></small>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="row">
+            <!-- Боковая панель -->
+            <div class="col-md-2 sidebar d-none d-md-block">
+                <div class="position-sticky pt-3">
+                    <ul class="nav flex-column">
+    <li class="nav-item">
+        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">
+            <i class="bi bi-speedometer2"></i> Дашборд
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'clients' in request.path %}active{% endif %}" href="/clients">
+            <i class="bi bi-people"></i> Клиенты
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'work_orders' in request.path %}active{% endif %}" href="/work_orders">
+            <i class="bi bi-clipboard-check"></i> Заказ-наряды
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'new_work_order' in request.path %}active{% endif %}" href="/new_work_order">
+            <i class="bi bi-clipboard-plus"></i> Новый заказ
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'tasks' in request.path %}active{% endif %}" href="/tasks">
+            <i class="bi bi-list-task"></i> Задачи
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'cash' in request.path %}active{% endif %}" href="/cash">
+            <i class="bi bi-cash-stack"></i> Касса
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link {% if 'settings' in request.path %}active{% endif %}" href="/settings">
+            <i class="bi bi-gear"></i> Настройки
+        </a>
+    </li>
+</ul>
+                </div>
+            </div>
+
+            <!-- Основное содержимое -->
+            <main class="col-md-10 ms-sm-auto px-md-4 py-3">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Скрипты -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+
+    <script>
+        // Обновление даты и времени
+        function updateDateTime() {
+            const now = new Date();
+            const options = {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            document.getElementById('currentDateTime').textContent =
+                now.toLocaleDateString('ru-RU', options);
+        }
+
+        // Обновляем каждую минуту
+        updateDateTime();
+        setInterval(updateDateTime, 60000);
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
