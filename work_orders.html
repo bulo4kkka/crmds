@@ -1,0 +1,713 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-clipboard-check me-2"></i>Заказ-наряды
+    </h2>
+    <div class="d-flex gap-2">
+        <form class="d-flex" method="get" action="/work_orders">
+            <input type="text" class="form-control form-control-sm" name="search" 
+                   placeholder="Поиск по номеру или клиенту..." value="{{ search_term }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm ms-2">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+        <a href="/new_work_order" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-circle"></i> Новый
+        </a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Список заказ-нарядов</span>
+        <small class="text-muted">Всего: {{ orders|length }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="accordion" id="ordersAccordion">
+            {% for order in orders %}
+            <div class="accordion-item border-0">
+                <div class="accordion-header">
+                    <button class="accordion-button collapsed d-flex justify-content-between align-items-center"
+                            type="button" data-bs-toggle="collapse"
+                            data-bs-target="#order{{ order.id }}"
+                            aria-expanded="false">
+                        <div class="d-flex align-items-center">
+                            <span class="badge status-badge-{{ order.status }} me-3">
+                                {% if order.status == 'new' %}В работе
+                                {% elif order.status == 'in_progress' %}В работе
+                                {% elif order.status == 'completed' %}Завершен
+                                {% else %}{{ order.status }}{% endif %}
+                            </span>
+                            <div>
+                                <strong>#{{ order.order_number }}</strong>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            {% if order.employee_name %}
+                            <span class="me-4">
+                                <i class="bi bi-person-badge"></i> {{ order.employee_name }}
+                            </span>
+                            {% endif %}
+                            <span class="fw-bold fs-5">{{ order.total_amount|format_money }} ₽</span>
+                            <i class="bi bi-chevron-down ms-3"></i>
+                        </div>
+                    </button>
+                </div>
+
+                <div id="order{{ order.id }}" class="accordion-collapse collapse"
+                     data-bs-parent="#ordersAccordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6>Информация о клиенте:</h6>
+                                <p class="mb-1">
+                                    <i class="bi bi-person me-2"></i>
+                                    <strong>{{ order.full_name }}</strong>
+                                </p>
+                                <p class="mb-1">
+                                    <i class="bi bi-telephone me-2"></i>
+                                    {{ order.phone }}
+                                </p>
+                                <p class="mb-1">
+                                    <i class="bi bi-car-front me-2"></i>
+                                    {{ order.car_model }}
+                                    {% if order.car_number %}
+                                    <span class="badge bg-secondary ms-2">{{ order.car_number }}</span>
+                                    {% endif %}
+                                </p>
+                                {% if order.employee_name %}
+                                <p class="mb-1">
+                                    <i class="bi bi-person-badge me-2"></i>
+                                    <strong>Исполнитель:</strong> {{ order.employee_name }}
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Выполненная работа:</h6>
+                                <div id="works{{ order.id }}">
+                                    <p class="text-muted">Загрузка работ...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mt-3">
+                            <div class="col-md-6">
+                                <h6>Запасные части и расходники:</h6>
+                                <div id="expenses{{ order.id }}">
+                                    <p class="text-muted">Загрузка запчастей...</p>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6>Финансовый расчет:</h6>
+                                <div id="financial{{ order.id }}">
+                                    <p class="text-muted">Загрузка финансов...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-top">
+                            <h6>Описание работ:</h6>
+                            <p class="mb-0">{{ order.description }}</p>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-top d-flex justify-content-between align-items-center">
+    <div>
+        <small class="text-muted">
+            Создан: {{ order.created_at[:19] }}
+            {% if order.completed_at %}
+            <br>Завершен: {{ order.completed_at[:19] }}
+            {% endif %}
+        </small>
+    </div>
+    <div class="d-flex gap-2">
+        {% if order.status != 'completed' %}
+        <a href="/edit_work_order/{{ order.id }}"
+           class="btn btn-sm btn-outline-warning d-flex align-items-center">
+            <i class="bi bi-pencil me-1"></i> Редактировать
+        </a>
+        <button class="btn btn-sm btn-outline-success d-flex align-items-center"
+                onclick="completeOrder({{ order.id }})"
+                title="Отметить как выполненный">
+            <i class="bi bi-check-circle me-1"></i> Завершить
+        </button>
+        {% endif %}
+
+        <button class="btn btn-sm btn-outline-info d-flex align-items-center"
+                onclick="showPrintDialog({{ order.id }})"
+                title="Печать заказ-наряда">
+            <i class="bi bi-printer me-1"></i> Печать
+        </button>
+
+        <button class="btn btn-sm btn-outline-danger d-flex align-items-center"
+                onclick="deleteOrder({{ order.id }})">
+            <i class="bi bi-trash me-1"></i> Удалить
+        </button>
+    </div>
+</div>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <div class="text-muted">
+                    <i class="bi bi-clipboard display-6 mb-3"></i>
+                    <p>Заказ-наряды не найдены</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="modal fade" id="printModal" tabindex="-1" aria-labelledby="printModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="printModalLabel">Печать заказ-наряда</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+                <div id="printContent">
+                    <!-- Содержимое для печати будет загружено сюда -->
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Загрузка...</span>
+                        </div>
+                        <p class="mt-2">Загрузка данных для печати...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" onclick="printOrder()">
+                    <i class="bi bi-printer"></i> Печать
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Скрытый контейнер для печати -->
+<div id="printContainer" style="display: none;"></div>
+</div>
+
+{% block scripts %}
+<script>
+// Загрузка данных для каждого заказ-наряда
+document.addEventListener('DOMContentLoaded', function() {
+    {% for order in orders %}
+    loadOrderData({{ order.id }});
+    {% endfor %}
+});
+
+function loadOrderData(orderId) {
+    $.ajax({
+        url: '/api/work_orders/' + orderId,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                renderOrderWorks(orderId, response.works);
+                renderOrderExpenses(orderId, response.expenses);
+                renderFinancialInfo(orderId, response.order, response.works, response.expenses);
+            } else {
+                $('#works' + orderId).html('<p class="text-danger">Ошибка загрузки работ</p>');
+                $('#expenses' + orderId).html('<p class="text-danger">Ошибка загрузки запчастей</p>');
+                $('#financial' + orderId).html('<p class="text-danger">Ошибка загрузки финансов</p>');
+            }
+        },
+        error: function() {
+            $('#works' + orderId).html('<p class="text-danger">Ошибка загрузки</p>');
+            $('#expenses' + orderId).html('<p class="text-danger">Ошибка загрузки</p>');
+            $('#financial' + orderId).html('<p class="text-danger">Ошибка загрузки</p>');
+        }
+    });
+}
+
+function renderOrderWorks(orderId, works) {
+    let html = '';
+    if (works && works.length > 0) {
+        works.forEach(work => {
+            const workTotal = (work.quantity * work.price_per_unit).toFixed(2);
+            html += `
+                <div class="d-flex justify-content-between mb-1">
+                    <span>${work.work_name}</span>
+                    <span>
+                        ${work.quantity} × ${work.price_per_unit} ₽ =
+                        <strong>${workTotal} ₽</strong>
+                    </span>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-muted">Нет выполненных работ</p>';
+    }
+    $('#works' + orderId).html(html);
+}
+
+function renderOrderExpenses(orderId, expenses) {
+    let html = '';
+    if (expenses && expenses.length > 0) {
+        expenses.forEach(expense => {
+            const cost = expense.cost_per_unit || 0;
+            const markup = expense.markup || 0;
+            const quantity = expense.quantity || 1;
+            const itemCost = cost * quantity;
+            const itemPrice = itemCost * (1 + markup / 100);
+            const markupAmount = itemPrice - itemCost;
+
+            const typeName = expense.expense_type === 'parts' ? 'Запчасти' : 'Расходники';
+
+            html += `
+                <div class="d-flex justify-content-between mb-1">
+                    <span>
+                        ${expense.expense_name}
+                        <span class="badge bg-secondary ms-1">${typeName}</span>
+                    </span>
+                    <span>
+                        ${quantity} × ${cost} ₽ + ${markup}% =
+                        <strong class="text-info">${itemPrice.toFixed(2)} ₽</strong>
+                    </span>
+                </div>
+            `;
+        });
+    } else {
+        html = '<p class="text-muted">Нет запчастей и расходников</p>';
+    }
+    $('#expenses' + orderId).html(html);
+}
+
+function renderFinancialInfo(orderId, order, works, expenses) {
+    let totalWorks = 0;
+    let totalExpenses = 0; // Общая сумма запчастей для клиента
+    let markupTotal = 0;
+    let expensesCost = 0; // Себестоимость запчастей
+
+    if (works) {
+        works.forEach(work => {
+            totalWorks += work.quantity * work.price_per_unit;
+        });
+    }
+
+    if (expenses) {
+        expenses.forEach(expense => {
+            const cost = expense.cost_per_unit || 0;
+            const markup = expense.markup || 0;
+            const quantity = expense.quantity || 1;
+            const itemCost = cost * quantity;
+            const itemPrice = itemCost * (1 + markup / 100);
+            expensesCost += itemCost;
+            totalExpenses += itemPrice;
+            markupTotal += itemPrice - itemCost;
+        });
+    }
+
+    const totalProfit = totalWorks + markupTotal;
+    const totalForClient = totalWorks + totalExpenses;
+
+    let html = `
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span>Выполненная работа:</span>
+                <span class="text-success">${totalWorks.toFixed(2)} ₽</span>
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span>Запчасти и расходники:</span>
+                <span class="text-info">${totalExpenses.toFixed(2)} ₽</span>
+            </div>
+        </div>
+
+        <div class="mb-2">
+            <div class="d-flex justify-content-between">
+                <span>Наценка на запчасти:</span>
+                <span class="text-success">${markupTotal.toFixed(2)} ₽</span>
+            </div>
+        </div>
+
+        <hr class="my-2">
+        <div class="d-flex justify-content-between">
+            <strong>Итого (клиенту):</strong>
+            <strong class="text-primary">${totalForClient.toFixed(2)} ₽</strong>
+        </div>
+
+        <hr class="my-2">
+        <div class="d-flex justify-content-between">
+            <strong>Общая прибыль:</strong>
+            <strong class="text-success">${totalProfit.toFixed(2)} ₽</strong>
+        </div>
+    `;
+
+    $('#financial' + orderId).html(html);
+}
+
+function completeOrder(orderId) {
+    if (confirm('Завершить заказ-наряд #' + orderId + '?\n\nЭто добавит доход в кассу.')) {
+        $.ajax({
+            url: '/api/work_orders/' + orderId + '/complete',
+            type: 'POST',
+            success: function(response) {
+                if (response.success) {
+                    alert('✅ Заказ завершен! Доход добавлен в кассу.');
+                    location.reload();
+                } else {
+                    alert('❌ Ошибка: ' + response.error);
+                }
+            },
+            error: function(xhr) {
+                try {
+                    const error = JSON.parse(xhr.responseText);
+                    alert('❌ Ошибка: ' + error.error);
+                } catch {
+                    alert('❌ Ошибка сервера');
+                }
+            }
+        });
+    }
+}
+
+function deleteOrder(orderId) {
+    if (confirm('Удалить заказ-наряд #' + orderId + '?\n\nЭто действие нельзя отменить.')) {
+        $.ajax({
+            url: '/api/work_orders/' + orderId,
+            type: 'DELETE',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + response.error);
+                }
+            },
+            error: function() {
+                alert('Ошибка при удалении заказ-наряда');
+            }
+        });
+    }
+}
+function showPrintDialog(orderId) {
+    // Показываем модальное окно
+    const printModal = new bootstrap.Modal(document.getElementById('printModal'));
+    printModal.show();
+
+    // Загружаем данные для печати
+    loadPrintData(orderId);
+}
+
+function loadPrintData(orderId) {
+    $.ajax({
+        url: '/api/work_orders/' + orderId,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                renderPrintContent(response.order, response.works, response.expenses);
+            } else {
+                $('#printContent').html(`
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i>
+                        Ошибка загрузки данных для печати: ${response.error}
+                    </div>
+                `);
+            }
+        },
+        error: function() {
+            $('#printContent').html(`
+                <div class="alert alert-danger">
+                    <i class="bi bi-exclamation-triangle"></i>
+                    Ошибка соединения с сервером
+                </div>
+            `);
+        }
+    });
+}
+
+function renderPrintContent(order, works, expenses) {
+    // Рассчитываем суммы (код остаётся прежним)
+    let worksTotal = 0;
+    let expensesTotal = 0;
+    let markupTotal = 0;
+    let expensesCost = 0;
+
+    if (works) {
+        works.forEach(work => {
+            worksTotal += work.quantity * work.price_per_unit;
+        });
+    }
+
+    if (expenses) {
+        expenses.forEach(expense => {
+            const cost = expense.cost_per_unit || 0;
+            const markup = expense.markup || 0;
+            const quantity = expense.quantity || 1;
+            const itemCost = cost * quantity;
+            const itemPrice = itemCost * (1 + markup / 100);
+
+            expensesCost += itemCost;
+            expensesTotal += itemPrice;
+            markupTotal += itemPrice - itemCost;
+        });
+    }
+
+    const totalAmount = worksTotal + expensesTotal;
+    const profit = worksTotal + markupTotal;
+
+    // Форматируем даты
+    const createdDate = order.created_at ? new Date(order.created_at).toLocaleDateString('ru-RU') : '';
+    const createdTime = order.created_at ? new Date(order.created_at).toLocaleTimeString('ru-RU', {hour: '2-digit', minute:'2-digit'}) : '';
+
+    const printHTML = `
+        <div class="print-content">
+            <!-- Шапка -->
+            <div class="text-center mb-3">
+                <h2 class="mb-1">АВТОСЕРВИС</h2>
+                <h3 class="mb-2">ЗАКАЗ-НАРЯД № ${order.order_number || ''}</h3>
+                <p class="mb-2"><small>Дата: ${createdDate} ${createdTime}</small></p>
+                <hr>
+            </div>
+
+            <!-- Информация о клиенте и заказе -->
+            <div class="row mb-3 avoid-break">
+                <div class="col-md-6">
+                    <h5>ИНФОРМАЦИЯ О КЛИЕНТЕ</h5>
+                    <table class="table-sm">
+                        <tr>
+                            <td style="width: 35%"><strong>ФИО:</strong></td>
+                            <td>${order.full_name || ''}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Телефон:</strong></td>
+                            <td>${order.phone || ''}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Автомобиль:</strong></td>
+                            <td>${order.car_model || ''}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Гос. номер:</strong></td>
+                            <td>${order.car_number || '-'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>VIN:</strong></td>
+                            <td>${order.vin || '-'}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="col-md-6">
+                    <h5>ИНФОРМАЦИЯ О ЗАКАЗЕ</h5>
+                    <table class="table-sm">
+                        <tr>
+                            <td style="width: 40%"><strong>Статус:</strong></td>
+                            <td>${order.status === 'completed' ? 'Завершен' : 'В работе'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Исполнитель:</strong></td>
+                            <td>${order.employee_name || 'Не назначен'}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Дата создания:</strong></td>
+                            <td>${createdDate}</td>
+                        </tr>
+                        ${order.completed_at ? `
+                        <tr>
+                            <td><strong>Дата завершения:</strong></td>
+                            <td>${new Date(order.completed_at).toLocaleDateString('ru-RU')}</td>
+                        </tr>
+                        ` : ''}
+                        <tr class="table-primary">
+                            <td><strong>Общая сумма:</strong></td>
+                            <td><strong>${totalAmount.toFixed(2)} ₽</strong></td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Описание работ -->
+            <div class="mb-3 avoid-break">
+                <h5>ОПИСАНИЕ РАБОТ</h5>
+                <div class="bg-light">
+                    ${order.description || 'Нет описания'}
+                </div>
+            </div>
+
+            <!-- Работы и материалы -->
+            <div class="row mb-3 avoid-break">
+                <!-- Выполненные работы -->
+                <div class="col-md-6">
+                    <h5>ВЫПОЛНЕННЫЕ РАБОТЫ</h5>
+                    ${works && works.length > 0 ? `
+                        <table class="table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 50%">Наименование</th>
+                                    <th style="width: 15%" class="text-end">Кол-во</th>
+                                    <th style="width: 20%" class="text-end">Цена</th>
+                                    <th style="width: 15%" class="text-end">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${works.map(work => {
+                                    const workSum = work.quantity * work.price_per_unit;
+                                    return `
+                                        <tr>
+                                            <td>${work.work_name}</td>
+                                            <td class="text-end">${work.quantity}</td>
+                                            <td class="text-end">${work.price_per_unit.toFixed(2)} ₽</td>
+                                            <td class="text-end">${workSum.toFixed(2)} ₽</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <td colspan="3" class="text-end"><strong>Итого:</strong></td>
+                                    <td class="text-end"><strong>${worksTotal.toFixed(2)} ₽</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    ` : '<p>Нет выполненных работ</p>'}
+                </div>
+
+                <!-- Запчасти и расходники -->
+                <div class="col-md-6">
+                    <h5>ЗАПАСНЫЕ ЧАСТИ И РАСХОДНИКИ</h5>
+                    ${expenses && expenses.length > 0 ? `
+                        <table class="table-sm">
+                            <thead>
+                                <tr>
+                                    <th style="width: 40%">Наименование</th>
+                                    <th style="width: 10%" class="text-end">Кол-во</th>
+                                    <th style="width: 20%" class="text-end">Стоимость</th>
+                                    <th style="width: 15%" class="text-end">Наценка</th>
+                                    <th style="width: 15%" class="text-end">Сумма</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${expenses.map(expense => {
+                                    const cost = expense.cost_per_unit || 0;
+                                    const markup = expense.markup || 0;
+                                    const quantity = expense.quantity || 1;
+                                    const itemCost = cost * quantity;
+                                    const itemPrice = itemCost * (1 + markup / 100);
+                                    const markupAmount = itemPrice - itemCost;
+
+                                    return `
+                                        <tr>
+                                            <td>${expense.expense_name}</td>
+                                            <td class="text-end">${quantity}</td>
+                                            <td class="text-end">${cost.toFixed(2)} ₽</td>
+                                            <td class="text-end">${markup}%</td>
+                                            <td class="text-end">${itemPrice.toFixed(2)} ₽</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr class="table-primary">
+                                    <td colspan="4" class="text-end"><strong>Итого:</strong></td>
+                                    <td class="text-end"><strong>${expensesTotal.toFixed(2)} ₽</strong></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    ` : '<p>Нет запчастей и расходников</p>'}
+                </div>
+            </div>
+
+            <!-- Финансовый расчет и подписи -->
+            <div class="row avoid-break">
+                <!-- Финансовый расчет -->
+                <div class="col-md-8">
+                    <h5>ФИНАНСОВЫЙ РАСЧЕТ</h5>
+                    <table class="table-sm" style="width: 80%">
+                        <tr>
+                            <td>Выполненные работы:</td>
+                            <td class="text-end">${worksTotal.toFixed(2)} ₽</td>
+                        </tr>
+                        <tr>
+                            <td>Запчасти и расходники:</td>
+                            <td class="text-end">${expensesTotal.toFixed(2)} ₽</td>
+                        </tr>
+                        <tr>
+                            <td>Наценка на запчасти:</td>
+                            <td class="text-end">${markupTotal.toFixed(2)} ₽</td>
+                        </tr>
+                        <tr class="table-success">
+                            <td><strong>ИТОГО К ОПЛАТЕ:</strong></td>
+                            <td class="text-end"><strong>${totalAmount.toFixed(2)} ₽</strong></td>
+                        </tr>
+                    </table>
+                </div>
+
+                <!-- Подписи -->
+                <div class="col-md-4">
+                    <div class="signature-area">
+                        <p><strong>ПОДПИСИ:</strong></p>
+                        <div class="mt-3">
+                            <p>Клиент:</p>
+                            <p class="mt-4">___________________</p>
+                            <p class="small">(подпись)</p>
+                        </div>
+                        <div class="mt-4">
+                            <p>Исполнитель:</p>
+                            <p class="mt-4">___________________</p>
+                            <p class="small">(подпись)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Примечание внизу -->
+            <div class="text-center mt-4 pt-3 border-top">
+                <p class="small text-muted">
+                    Заказ-наряд №${order.order_number}<br>
+                    Дата создания: ${order.created_at ? new Date(order.created_at).toLocaleString('ru-RU') : ''}
+                    ${order.completed_at ? `| Дата завершения: ${new Date(order.completed_at).toLocaleString('ru-RU')}` : ''}
+                </p>
+            </div>
+        </div>
+    `;
+
+    $('#printContent').html(printHTML);
+}
+
+function printOrder() {
+    // Клонируем содержимое для печати
+    const printElement = $('#printContent').find('.print-content').clone();
+
+    // Создаем временный контейнер для печати
+    const printContainer = $('<div id="printTemp" class="print-content"></div>')
+        .css({
+            'position': 'absolute',
+            'left': '-9999px',
+            'top': '0',
+            'width': '210mm', // A4 ширина
+            'min-height': '297mm', // A4 высота
+            'padding': '15mm',
+            'margin': '0',
+            'box-sizing': 'border-box',
+            'background': '#fff',
+            'font-size': '12px',
+            'line-height': '1.2'
+        })
+        .append(printElement);
+
+    // Добавляем на страницу
+    $('body').append(printContainer);
+
+    // Запускаем печать
+    window.print();
+
+    // Удаляем временный контейнер
+    setTimeout(() => {
+        $('#printTemp').remove();
+
+        // Закрываем модальное окно
+        const printModal = bootstrap.Modal.getInstance(document.getElementById('printModal'));
+        if (printModal) {
+            printModal.hide();
+        }
+    }, 500);
+}
+</script>
+{% endblock %}
+{% endblock %}

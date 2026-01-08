@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-cash-stack me-2"></i>Касса
+    </h2>
+    <div class="d-flex gap-2">
+        <div class="btn-group" role="group">
+            <a href="/cash?period=day" class="btn btn-outline-primary btn-sm {% if period == 'day' %}active{% endif %}">
+                День
+            </a>
+            <a href="/cash?period=week" class="btn btn-outline-primary btn-sm {% if period == 'week' %}active{% endif %}">
+                Неделя
+            </a>
+            <a href="/cash?period=month" class="btn btn-outline-primary btn-sm {% if period == 'month' %}active{% endif %}">
+                Месяц
+            </a>
+            <a href="/cash?period=year" class="btn btn-outline-primary btn-sm {% if period == 'year' %}active{% endif %}">
+                Год
+            </a>
+        </div>
+
+        <div class="btn-group" role="group">
+            <a href="/cash?period={{ period }}" class="btn btn-outline-secondary btn-sm {% if not transaction_type %}active{% endif %}">
+                Все операции
+            </a>
+            <a href="/cash?period={{ period }}&type=income" class="btn btn-outline-success btn-sm {% if transaction_type == 'income' %}active{% endif %}">
+                Только доходы
+            </a>
+            <a href="/cash?period={{ period }}&type=expense" class="btn btn-outline-danger btn-sm {% if transaction_type == 'expense' %}active{% endif %}">
+                Только расходы
+            </a>
+        </div>
+
+        <div class="btn-group" role="group">
+            <button class="btn btn-success btn-sm" onclick="openCashOperation('income')">
+                <i class="bi bi-plus-circle"></i> Внести
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="openCashOperation('expense')">
+                <i class="bi bi-dash-circle"></i> Изъять
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Статистика -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-dark border-success">
+            <div class="card-body text-center">
+                <h3 class="card-title text-success">{{ "%.2f"|format(financial_stats.total_income) }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-arrow-up-circle fs-4"></i><br>
+                    Доходы за период
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-danger">
+            <div class="card-body text-center">
+                <h3 class="card-title text-danger">{{ "%.2f"|format(financial_stats.total_expenses) }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-arrow-down-circle fs-4"></i><br>
+                    Расходы за период
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-primary">
+            <div class="card-body text-center">
+                <h3 class="card-title text-primary">{{ "%.2f"|format(financial_stats.net_profit) }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-graph-up fs-4"></i><br>
+                    Чистая прибыль
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card bg-dark border-warning">
+            <div class="card-body text-center">
+                <h3 class="card-title text-warning">{{ "%.2f"|format(total_balance) }} ₽</h3>
+                <p class="card-text">
+                    <i class="bi bi-wallet fs-4"></i><br>
+                    Общий баланс
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Фильтр по категориям -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Фильтр по категориям доходов</h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group flex-wrap" role="group">
+                    <a href="/cash?period={{ period }}&type=income" class="btn btn-outline-secondary btn-sm mb-1 {% if not category %}active{% endif %}">
+                        Все доходы
+                    </a>
+                    {% for cat in income_categories %}
+                    <a href="/cash?period={{ period }}&type=income&category={{ cat }}" class="btn btn-outline-success btn-sm mb-1 {% if selected_category == cat %}active{% endif %}">
+                        {{ cat_names[cat] }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Фильтр по категориям расходов</h5>
+            </div>
+            <div class="card-body">
+                <div class="btn-group flex-wrap" role="group">
+                    <a href="/cash?period={{ period }}&type=expense" class="btn btn-outline-secondary btn-sm mb-1 {% if not category %}active{% endif %}">
+                        Все расходы
+                    </a>
+                    {% for cat in expense_categories %}
+                    <a href="/cash?period={{ period }}&type=expense&category={{ cat }}" class="btn btn-outline-danger btn-sm mb-1 {% if selected_category == cat %}active{% endif %}">
+                        {{ cat_names[cat] }}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Операции -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Операции за период</span>
+        <small class="text-muted">{{ financial_stats.start_date }} - {{ financial_stats.end_date }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Тип</th>
+                        <th>Категория</th>
+                        <th>Описание</th>
+                        <th>Сумма</th>
+                        <th>Ссылка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for flow in cash_flow %}
+                    <tr>
+                        <td>{{ flow.date[:16] }}</td>
+                        <td>
+                            {% if flow.transaction_type == 'income' %}
+                            <span class="badge bg-success">Доход</span>
+                            {% else %}
+                            <span class="badge bg-danger">Расход</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if flow.transaction_type == 'income' %}
+                                {% if flow.category == 'order_work' %}
+                                <span class="badge bg-success">Работы по заказу</span>
+                                {% elif flow.category == 'order_markup' %}
+                                <span class="badge bg-info">Наценка на запчасти</span>
+                                {% elif flow.category == 'salary_paid' %}
+                                <span class="badge bg-warning">Выплата зарплаты</span>
+                                {% elif flow.category == 'cash_in' %}
+                                <span class="badge bg-secondary">Внесение наличных</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ flow.category }}</span>
+                                {% endif %}
+                            {% else %}
+                                {% if flow.category == 'salary' %}
+                                <span class="badge bg-primary">Зарплата</span>
+                                {% elif flow.category == 'parts_purchase' %}
+                                <span class="badge bg-danger">Покупка запчастей</span>
+                                {% elif flow.category == 'rent' %}
+                                <span class="badge bg-warning">Аренда</span>
+                                {% elif flow.category == 'utilities' %}
+                                <span class="badge bg-info">Коммунальные</span>
+                                {% elif flow.category == 'cash_out' %}
+                                <span class="badge bg-secondary">Изъятие наличных</span>
+                                {% else %}
+                                <span class="badge bg-secondary">{{ flow.category }}</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td>{{ flow.description or '—' }}</td>
+                        <td>
+                            {% if flow.transaction_type == 'income' %}
+                            <span class="text-success">+{{ "%.2f"|format(flow.amount) }} ₽</span>
+                            {% else %}
+                            <span class="text-danger">-{{ "%.2f"|format(flow.amount) }} ₽</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if flow.order_id %}
+                            <a href="/work_orders?search={{ flow.order_id }}" class="btn btn-outline-info btn-sm">
+                                #{{ flow.order_id }}
+                            </a>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-cash display-6 mb-3"></i>
+                                <p>Операции не найдены</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно операции с кассой -->
+<div class="modal fade" id="cashOperationModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cashModalTitle">
+                    <i class="bi bi-plus-circle me-2"></i>Операция с кассой
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="cashOperationForm">
+                    <div class="mb-3">
+                        <label class="form-label">Тип операции *</label>
+                        <select class="form-select" id="transactionType" required onchange="updateOperationType()">
+                            <option value="">-- Выберите тип --</option>
+                            <option value="income">Внесение в кассу</option>
+                            <option value="expense">Изъятие из кассы</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="expenseCheckbox" style="display: none;">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="addToExpenses" checked>
+                            <label class="form-check-label" for="addToExpenses">
+                                Добавить в расходы
+                            </label>
+                        </div>
+                        <small class="text-muted">Если отмечено, сумма будет учтена в расходах за период</small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Категория *</label>
+                        <select class="form-select" id="category" required>
+                            <option value="">-- Сначала выберите тип --</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Сумма *</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="amount" required step="0.01" min="0.01">
+                            <span class="input-group-text">₽</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Комментарий *</label>
+                        <textarea class="form-control" id="description" rows="3" required placeholder="Опишите операцию..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveCashOperation()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Категории для доходов и расходов
+const categories = {
+    income: [
+        {value: 'cash_in', label: 'Внесение наличных'},
+        {value: 'salary_paid', label: 'Выплата зарплаты'},
+        {value: 'other_income', label: 'Прочий доход'}
+    ],
+    expense: [
+        {value: 'salary', label: 'Зарплата'},
+        {value: 'parts_purchase', label: 'Покупка запчастей'},
+        {value: 'rent', label: 'Аренда'},
+        {value: 'utilities', label: 'Коммунальные'},
+        {value: 'cash_out', label: 'Изъятие наличных'},
+        {value: 'other_expense', label: 'Прочие расходы'}
+    ]
+};
+
+// Открытие модального окна для операции с кассой
+function openCashOperation(type) {
+    const modal = $('#cashOperationModal');
+    const title = $('#cashModalTitle');
+    const form = $('#cashOperationForm')[0];
+
+    if (type === 'income') {
+        title.html('<i class="bi bi-plus-circle me-2"></i>Внесение в кассу');
+        $('#transactionType').val('income');
+    } else {
+        title.html('<i class="bi bi-dash-circle me-2"></i>Изъятие из кассы');
+        $('#transactionType').val('expense');
+    }
+
+    form.reset();
+    updateOperationType();
+    modal.modal('show');
+}
+
+// Обновление типа операции
+function updateOperationType() {
+    const type = $('#transactionType').val();
+    const categorySelect = $('#category');
+    const expenseCheckbox = $('#expenseCheckbox');
+
+    // Показываем/скрываем чекбокс для расходов
+    if (type === 'expense') {
+        expenseCheckbox.show();
+    } else {
+        expenseCheckbox.hide();
+    }
+
+    // Обновляем категории
+    categorySelect.empty();
+
+    if (!type) {
+        categorySelect.append('<option value="">-- Сначала выберите тип --</option>');
+        return;
+    }
+
+    categorySelect.append('<option value="">-- Выберите категорию --</option>');
+
+    categories[type].forEach(cat => {
+        categorySelect.append(`<option value="${cat.value}">${cat.label}</option>`);
+    });
+}
+
+// Сохранение операции
+function saveCashOperation() {
+    const transactionType = $('#transactionType').val();
+    const category = $('#category').val();
+    const amount = parseFloat($('#amount').val());
+    const description = $('#description').val();
+    const addToExpenses = $('#addToExpenses').is(':checked');
+
+    if (!transactionType || !category || !amount || !description) {
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+
+    if (amount <= 0) {
+        alert('Сумма должна быть больше 0');
+        return;
+    }
+
+    // Если это изъятие и чекбокс не отмечен, используем специальную категорию
+    let finalCategory = category;
+    if (transactionType === 'expense' && !addToExpenses) {
+        finalCategory = 'cash_out_no_expense';
+    }
+
+    const transactionData = {
+        transaction_type: transactionType,
+        category: finalCategory,
+        amount: amount,
+        description: description
+    };
+
+    $.ajax({
+        url: '/api/cash/add',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(transactionData),
+        success: function(response) {
+            if (response.success) {
+                $('#cashOperationModal').modal('hide');
+                $('#cashOperationForm')[0].reset();
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,357 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0" style="font-family: 'Montserrat', sans-serif;">
+        <i class="bi bi-people me-2"></i>Клиенты
+    </h2>
+    <div class="d-flex gap-2">
+        <form class="d-flex" method="get" action="/clients">
+            <input type="text" class="form-control form-control-sm" name="search"
+                   placeholder="Поиск клиентов..." value="{{ search_term }}">
+            <button type="submit" class="btn btn-outline-primary btn-sm ms-2">
+                <i class="bi bi-search"></i>
+            </button>
+        </form>
+        <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addClientModal">
+            <i class="bi bi-plus-circle"></i> Добавить
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Список клиентов</span>
+        <small class="text-muted">Всего: {{ clients|length }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th width="60">ID</th>
+                        <th>Имя</th>
+                        <th>Телефон</th>
+                        <th>Автомобиль</th>
+                        <th>Номер авто</th>
+                        <th>Заказы</th>
+                        <th width="100">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for client in clients %}
+                    <tr class="client-row {% if loop.index is even %}table-active{% endif %}">
+                        <td class="fw-bold">#{{ client.id }}</td>
+                        <td>{{ client.full_name }}</td>
+                        <td>
+                            <i class="bi bi-telephone me-1"></i>
+                            {{ client.phone }}
+                        </td>
+                        <td>
+                            <i class="bi bi-car-front me-1"></i>
+                            {{ client.car_model }}
+                            {% if client.car_year %}
+                            <span class="text-muted">({{ client.car_year }})</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if client.car_number %}
+                            <span class="badge bg-secondary">{{ client.car_number }}</span>
+                            {% else %}
+                            <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="/work_orders?search={{ client.phone }}" class="btn btn-outline-info btn-sm btn-sm"
+                               title="Просмотреть заказы клиента">
+                                <i class="bi bi-clipboard-check"></i> Заказы
+                            </a>
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-success"
+                                        onclick="createOrderForClient({{ client.id }})" title="Создать заказ">
+                                    <i class="bi bi-clipboard-plus"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-warning"
+                                        onclick="editClient({{ client.id }})" title="Редактировать">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-outline-danger"
+                                        onclick="deleteClient({{ client.id }})" title="Удалить">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4">
+                            <div class="text-muted">
+                                <i class="bi bi-people display-6 mb-3"></i>
+                                <p>Клиенты не найдены</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно добавления клиента -->
+<div class="modal fade" id="addClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-person-plus me-2"></i>Добавить клиента
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="clientForm">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">ФИО *</label>
+                            <input type="text" class="form-control" name="full_name" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Телефон *</label>
+                            <input type="tel" class="form-control" name="phone" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Модель авто *</label>
+                            <input type="text" class="form-control" name="car_model" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Год выпуска</label>
+                            <input type="number" class="form-control" name="car_year" min="1990" max="2024">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Номер авто</label>
+                            <input type="text" class="form-control" name="car_number">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">VIN номер</label>
+                            <input type="text" class="form-control" name="vin">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Примечания</label>
+                        <textarea class="form-control" name="notes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="saveClient()">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Модальное окно редактирования клиента -->
+<div class="modal fade" id="editClientModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-pencil me-2"></i>Редактировать клиента
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editClientForm">
+                    <input type="hidden" id="editClientId">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">ФИО *</label>
+                            <input type="text" class="form-control" id="editFullName" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Телефон *</label>
+                            <input type="tel" class="form-control" id="editPhone" required>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Модель авто *</label>
+                            <input type="text" class="form-control" id="editCarModel" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Год выпуска</label>
+                            <input type="number" class="form-control" id="editCarYear" min="1990" max="2024">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Номер авто</label>
+                            <input type="text" class="form-control" id="editCarNumber">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">VIN номер</label>
+                            <input type="text" class="form-control" id="editVin">
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Примечания</label>
+                        <textarea class="form-control" id="editNotes" rows="2"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                <button type="button" class="btn btn-primary" onclick="updateClient()">Обновить</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+// Создание заказа для клиента
+function createOrderForClient(clientId) {
+    window.location.href = `/new_work_order?client_id=${clientId}`;
+}
+
+// Сохранение клиента
+function saveClient() {
+    const form = $('#clientForm');
+    const data = {};
+
+    form.serializeArray().forEach(item => {
+        if (item.value.trim()) {
+            data[item.name] = item.value.trim();
+        }
+    });
+
+    // Валидация
+    if (!data.full_name || !data.phone || !data.car_model) {
+        alert('Пожалуйста, заполните обязательные поля (ФИО, Телефон, Модель авто)');
+        return;
+    }
+
+    $.ajax({
+        url: '/api/clients/add',
+        type: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#addClientModal').modal('hide');
+                form[0].reset();
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+
+// Редактирование клиента
+function editClient(clientId) {
+    $.ajax({
+        url: '/api/clients/' + clientId,
+        type: 'GET',
+        success: function(response) {
+            if (response.success) {
+                const client = response.client;
+                $('#editClientId').val(client.id);
+                $('#editFullName').val(client.full_name);
+                $('#editPhone').val(client.phone);
+                $('#editCarModel').val(client.car_model);
+                $('#editCarYear').val(client.car_year || '');
+                $('#editCarNumber').val(client.car_number || '');
+                $('#editVin').val(client.vin || '');
+                $('#editNotes').val(client.notes || '');
+
+                $('#editClientModal').modal('show');
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function() {
+            alert('Ошибка при загрузке данных клиента');
+        }
+    });
+}
+
+// Обновление клиента
+function updateClient() {
+    const clientId = $('#editClientId').val();
+    const data = {
+        full_name: $('#editFullName').val(),
+        phone: $('#editPhone').val(),
+        car_model: $('#editCarModel').val(),
+        car_year: $('#editCarYear').val() || null,
+        car_number: $('#editCarNumber').val() || '',
+        vin: $('#editVin').val() || '',
+        notes: $('#editNotes').val() || ''
+    };
+
+    // Валидация
+    if (!data.full_name || !data.phone || !data.car_model) {
+        alert('Пожалуйста, заполните обязательные поля');
+        return;
+    }
+
+    $.ajax({
+        url: '/api/clients/' + clientId,
+        type: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(data),
+        success: function(response) {
+            if (response.success) {
+                $('#editClientModal').modal('hide');
+                location.reload();
+            } else {
+                alert('Ошибка: ' + response.error);
+            }
+        },
+        error: function(xhr) {
+            try {
+                const error = JSON.parse(xhr.responseText);
+                alert('Ошибка: ' + error.error);
+            } catch {
+                alert('Ошибка сервера');
+            }
+        }
+    });
+}
+
+// Удаление клиента
+function deleteClient(clientId) {
+    if (confirm('Удалить клиента #' + clientId + '?\n\nЭто действие нельзя отменить.')) {
+        $.ajax({
+            url: '/api/clients/' + clientId,
+            type: 'DELETE',
+            success: function(response) {
+                if (response.success) {
+                    location.reload();
+                } else {
+                    alert('Ошибка: ' + response.error);
+                }
+            },
+            error: function() {
+                alert('Ошибка при удалении клиента');
+            }
+        });
+    }
+}
+</script>
+{% endblock %}
+{% endblock %}
